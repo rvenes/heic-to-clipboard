@@ -1,10 +1,8 @@
 # HeicToClipboard
 
-HeicToClipboard adds a Windows Explorer context-menu entry for `.heic` and `.heif` files:
+Right click HEIC → C&C to JPEG → Ctrl+V
 
-`C&C to JPEG`
-
-When you use it, the tool converts the selected image files to JPEG, stores the JPEGs in a dedicated temp folder, and places them on the clipboard as files so you can paste them directly into Discord, forums, email clients, and other apps that accept pasted file attachments.
+HeicToClipboard adds a Windows Explorer context-menu entry for `.heic` and `.heif` files named `C&C to JPEG`. It converts the selected files to JPEG, stores them in a dedicated temp folder, and places them on the clipboard so you can paste them directly into Discord, forums, email clients, and other apps that accept pasted file attachments.
 
 No permanent JPEG files are written next to the originals.
 
@@ -24,13 +22,16 @@ Official binaries are built by GitHub Actions.
 
 ### Install from a release
 
-1. Download `HeicToClipboard.exe` from a GitHub release.
-2. Open PowerShell in the repository root or extracted release folder.
-3. Run:
+1. Download the ZIP from the latest GitHub release.
+2. Extract the ZIP to a normal folder, for example your Downloads folder.
+3. Open PowerShell in the extracted folder.
+4. Run:
 
 ```powershell
-.\install.ps1 -SourceExe .\HeicToClipboard.exe
+powershell -ExecutionPolicy Bypass -File install.ps1 -SourceExe HeicToClipboard.exe
 ```
+
+This temporarily bypasses the PowerShell execution policy only for this install step. It does not change the policy permanently.
 
 The script installs the executable to:
 
@@ -49,7 +50,7 @@ and registers the Explorer context-menu entry for `.heic` and `.heif` under the 
 2. Install it:
 
 ```powershell
-.\install.ps1
+powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
 If the installed executable is missing, `install.ps1` looks for:
