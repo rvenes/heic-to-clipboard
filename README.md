@@ -141,6 +141,16 @@ To test multi-file behavior:
 3. Press `Ctrl+V` in Discord.
 4. Confirm that Discord shows multiple JPEG attachments.
 
-## Donations
+## Support the project
 
-If this project saves you time and you want to support maintenance, a donations or sponsorship link can be added in the future.
+If this tool saved you time, you can support development with a small donation.
+
+These tools are created and maintained in spare time and released as free and open-source software.
+
+If one of the projects helped you, consider supporting the work with a small donation.  
+It helps keep the projects maintained and improving.
+
+Donations are completely optional but always appreciated.
+
+Donate here:
+https://www.paypal.com/donate/?business=VSSTWS8ETDPXW&no_recurring=0&item_name=Support+development+of+free+open-source+tools.+Donations+help+maintain+and+improve+these+projects.&currency_code=USD
