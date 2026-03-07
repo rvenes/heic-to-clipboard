@@ -1,0 +1,130 @@
+name: build
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore app
+        run: dotnet restore src/CandC.HeicClipboard/CandC.HeicClipboard.csproj
+
+      - name: Restore tests
+        run: dotnet restore tests/CandC.HeicClipboard.Tests/CandC.HeicClipboard.Tests.csproj
+
+      - name: Build app
+        run: dotnet build src/CandC.HeicClipboard/CandC.HeicClipboard.csproj --configuration Release --no-restore
+
+      - name: Build tests
+        run: dotnet build tests/CandC.HeicClipboard.Tests/CandC.HeicClipboard.Tests.csproj --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test tests/CandC.HeicClipboard.Tests/CandC.HeicClipboard.Tests.csproj --configuration Release --no-build
+
+      - name: Publish
+        run: >
+          dotnet publish src/CandC.HeicClipboard/CandC.HeicClipboard.csproj
+          --configuration Release
+          --runtime win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:AssemblyName=HeicToClipboard
+          --output artifacts/publish/win-x64
+
+      - name: Upload publish artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: heic-to-clipboard-win-x64
+          path: artifacts/publish/win-x64
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download publish artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: heic-to-clipboard-win-x64
+          path: artifacts/publish/win-x64
+
+      - name: Prepare release assets
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+
+          $publishDir = Join-Path $PWD 'artifacts\publish\win-x64'
+          $stageDir = Join-Path $PWD 'artifacts\release'
+          $zipPath = Join-Path $stageDir 'HeicToClipboard-win-x64.zip'
+          $checksumPath = Join-Path $stageDir 'SHA256SUMS.txt'
+          $exePath = Join-Path $publishDir 'HeicToClipboard.exe'
+
+          if (Test-Path $stageDir) {
+              Remove-Item -Path $stageDir -Recurse -Force
+          }
+
+          New-Item -ItemType Directory -Path $stageDir | Out-Null
+          Copy-Item $exePath $stageDir
+          Copy-Item README.md $stageDir
+          Copy-Item LICENSE $stageDir
+          Copy-Item install.ps1 $stageDir
+          Copy-Item uninstall.ps1 $stageDir
+
+          Compress-Archive -Path (Join-Path $stageDir 'HeicToClipboard.exe'), (Join-Path $stageDir 'README.md'), (Join-Path $stageDir 'LICENSE'), (Join-Path $stageDir 'install.ps1'), (Join-Path $stageDir 'uninstall.ps1') -DestinationPath $zipPath -Force
+
+          $exeHash = (Get-FileHash -Path (Join-Path $stageDir 'HeicToClipboard.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
+          $zipHash = (Get-FileHash -Path $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+
+          @(
+            "$exeHash  HeicToClipboard.exe"
+            "$zipHash  HeicToClipboard-win-x64.zip"
+          ) | Set-Content -Path $checksumPath -NoNewline:$false
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+
+          $tag = $env:GITHUB_REF_NAME
+          $releaseExists = $true
+          try {
+              gh release view $tag | Out-Null
+          }
+          catch {
+              $releaseExists = $false
+          }
+
+          if (-not $releaseExists) {
+              gh release create $tag --title $tag --generate-notes
+          }
+
+          gh release upload $tag `
+            artifacts/publish/win-x64/HeicToClipboard.exe `
+            artifacts/release/HeicToClipboard-win-x64.zip `
+            artifacts/release/SHA256SUMS.txt `
+            --clobber
