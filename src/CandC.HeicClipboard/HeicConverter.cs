@@ -12,10 +12,12 @@ public sealed class HeicConverter
         .Single(static codec => codec.FormatID == ImageFormat.Jpeg.Guid);
 
     private readonly TempFileManager _tempFileManager;
+    private readonly HeicConversionOptions _conversionOptions;
 
-    public HeicConverter(TempFileManager tempFileManager)
+    public HeicConverter(TempFileManager tempFileManager, HeicConversionOptions conversionOptions)
     {
         _tempFileManager = tempFileManager;
+        _conversionOptions = conversionOptions;
     }
 
     public ConversionResult Convert(string sourcePath)
@@ -28,12 +30,13 @@ public sealed class HeicConverter
             }
 
             using var sourceBitmap = LoadSourceBitmap(sourcePath);
-            foreach (var attempt in JpegEncodingPlanner.CreateAttempts())
+            using var baseBitmap = ApplyDimensionCap(sourceBitmap, _conversionOptions);
+            foreach (var attempt in JpegEncodingPlanner.CreateAttempts(_conversionOptions.InitialJpegQuality))
             {
-                using var candidateBitmap = CreateCandidateBitmap(sourceBitmap, attempt.ScalePercent);
+                using var candidateBitmap = CreateCandidateBitmap(baseBitmap, attempt.ScalePercent);
                 using var encodedStream = EncodeJpeg(candidateBitmap, attempt.Quality);
 
-                if (encodedStream.Length > AppConstants.MaximumJpegBytes)
+                if (encodedStream.Length > _conversionOptions.MaximumBytes)
                 {
                     continue;
                 }
@@ -57,6 +60,22 @@ public sealed class HeicConverter
         {
             return ConversionResult.Failed(sourcePath, exception.Message);
         }
+    }
+
+    private static Bitmap ApplyDimensionCap(Bitmap sourceBitmap, HeicConversionOptions options)
+    {
+        if (options.KeepOriginalResolution)
+        {
+            return (Bitmap)sourceBitmap.Clone();
+        }
+
+        var fitted = ImageResizePlanner.FitWithinLongestSide(sourceBitmap.Width, sourceBitmap.Height, options.MaxLongestSidePx);
+        if (fitted.Width == sourceBitmap.Width && fitted.Height == sourceBitmap.Height)
+        {
+            return (Bitmap)sourceBitmap.Clone();
+        }
+
+        return ResizeBitmap(sourceBitmap, fitted.Width, fitted.Height);
     }
 
     private static Bitmap LoadSourceBitmap(string sourcePath)
@@ -207,6 +226,11 @@ public sealed class HeicConverter
         var width = Math.Max(1, (int)Math.Round(sourceBitmap.Width * (scalePercent / 100d)));
         var height = Math.Max(1, (int)Math.Round(sourceBitmap.Height * (scalePercent / 100d)));
 
+        return ResizeBitmap(sourceBitmap, width, height);
+    }
+
+    private static Bitmap ResizeBitmap(Bitmap sourceBitmap, int width, int height)
+    {
         var bitmap = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
         bitmap.SetResolution(sourceBitmap.HorizontalResolution, sourceBitmap.VerticalResolution);
 

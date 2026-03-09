@@ -4,16 +4,27 @@ namespace CandC.HeicClipboard;
 
 public sealed class TempFileManager
 {
-    public TempFileManager(string? workingDirectory = null)
+    private readonly TimeSpan _cleanupAge;
+
+    public TempFileManager(string? workingDirectory = null, TimeSpan? cleanupAge = null, bool cleanupEnabled = true)
     {
-        WorkingDirectory = workingDirectory ?? Path.Combine(Path.GetTempPath(), AppConstants.TempFolderName);
+        WorkingDirectory = workingDirectory ?? AppConstants.DefaultTempDirectory;
+        _cleanupAge = cleanupAge ?? AppConstants.TempFileMaxAge;
+        CleanupEnabled = cleanupEnabled;
         Directory.CreateDirectory(WorkingDirectory);
     }
 
     public string WorkingDirectory { get; }
 
+    public bool CleanupEnabled { get; }
+
     public void CleanupExpiredFiles()
     {
+        if (!CleanupEnabled)
+        {
+            return;
+        }
+
         foreach (var expiredFile in GetExpiredFiles(DateTime.UtcNow))
         {
             try
@@ -28,12 +39,17 @@ public sealed class TempFileManager
 
     public IReadOnlyList<string> GetExpiredFiles(DateTime utcNow)
     {
+        if (!CleanupEnabled)
+        {
+            return Array.Empty<string>();
+        }
+
         if (!Directory.Exists(WorkingDirectory))
         {
             return Array.Empty<string>();
         }
 
-        var expirationThreshold = utcNow - AppConstants.TempFileMaxAge;
+        var expirationThreshold = utcNow - _cleanupAge;
         return Directory
             .EnumerateFiles(WorkingDirectory, $"{AppConstants.TempFilePrefix}*.*", SearchOption.TopDirectoryOnly)
             .Where(path => File.GetLastWriteTimeUtc(path) < expirationThreshold)

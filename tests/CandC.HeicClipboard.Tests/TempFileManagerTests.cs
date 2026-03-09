@@ -29,6 +29,20 @@ public sealed class TempFileManagerTests : IDisposable
         Assert.Equal(expiredManagedFile, expiredFiles[0], ignoreCase: true);
     }
 
+    [Fact]
+    public void GetExpiredFiles_ReturnsEmptyWhenCleanupIsDisabled()
+    {
+        Directory.CreateDirectory(_workingDirectory);
+        var manager = new TempFileManager(_workingDirectory, cleanupEnabled: false);
+        var expiredManagedFile = Path.Combine(_workingDirectory, $"{AppConstants.TempFilePrefix}expired.jpg");
+        File.WriteAllText(expiredManagedFile, "old");
+        File.SetLastWriteTimeUtc(expiredManagedFile, DateTime.UtcNow - TimeSpan.FromDays(10));
+
+        var expiredFiles = manager.GetExpiredFiles(DateTime.UtcNow);
+
+        Assert.Empty(expiredFiles);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_workingDirectory))
