@@ -8,6 +8,8 @@ It converts the selected images to JPEG and places them on the clipboard so they
 
 No permanent JPEG files are written next to the originals.
 
+If you start `HeicToClipboard.exe` directly, it opens a small settings window where you can change output folder, max file size, JPEG quality, and optional resolution cap.
+
 ---
 
 ## Requirements
@@ -47,30 +49,45 @@ The command temporarily bypasses the PowerShell execution policy only for this i
 
 The images will be pasted as JPEG attachments.
 
+If you start `HeicToClipboard.exe` directly from:
+
+`%LocalAppData%\Programs\HeicToClipboard`
+
+the app opens its settings window instead of converting files.
+
 ---
 
 ## What the tool does
 
 - Converts HEIC / HEIF → JPEG
-- Starts at JPEG quality 95
-- Reduces quality if needed
-- Scales down only if required
-- Targets a maximum size of **9.8 MB per file**
-- Stores temporary files in:
+- Uses these default settings out of the box:
+  - JPEG quality starts at 95
+  - maximum file size target is **9.8 MB per file**
+  - original resolution is kept unless downscaling is needed to stay under the size limit
+  - output is written to the temp folder
+- Can be configured to change:
+  - max file size
+  - JPEG quality
+  - longest-side resolution cap while keeping aspect ratio
+  - output folder
+- Stores temporary files in the default mode:
 
 %TEMP%\HeicClipboardConvert
 
-Temporary files older than 24 hours are cleaned automatically.
+Temporary files older than 24 hours are cleaned automatically when temp-folder mode is active.
 
 ---
 
 ## Security
 
 - No telemetry
-- No network access
 - No background services
 
-The application never uploads files and does not keep permanent copies.
+The application never uploads files.
+
+By default it writes generated JPEG files to the local temp folder and cleans up its own old temp files automatically.
+
+If you choose a custom output folder in settings, files are written there instead, including network locations if you select one.
 
 ---
 
