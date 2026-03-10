@@ -105,7 +105,7 @@ jobs:
       - name: Create GitHub Release
         shell: pwsh
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           Set-StrictMode -Version Latest
           $ErrorActionPreference = 'Stop'
@@ -113,17 +113,17 @@ jobs:
           $tag = $env:GITHUB_REF_NAME
           $releaseExists = $true
           try {
-              gh release view $tag | Out-Null
+              gh release view $tag --repo $env:GITHUB_REPOSITORY | Out-Null
           }
           catch {
               $releaseExists = $false
           }
 
           if (-not $releaseExists) {
-              gh release create $tag --title $tag --generate-notes
+              gh release create $tag --repo $env:GITHUB_REPOSITORY --title $tag --generate-notes
           }
 
-          gh release upload $tag `
+          gh release upload $tag --repo $env:GITHUB_REPOSITORY `
             artifacts/publish/win-x64/HeicToClipboard.exe `
             artifacts/release/HeicToClipboard-win-x64.zip `
             artifacts/release/SHA256SUMS.txt `
