@@ -1,33 +1,26 @@
 using System.Collections.Specialized;
-using System.Drawing;
 using System.Windows.Forms;
 
 namespace CandC.HeicClipboard;
 
 public sealed class ClipboardService
 {
+    private readonly Action<DataObject> _clipboardWriter;
+
+    public ClipboardService(Action<DataObject>? clipboardWriter = null)
+    {
+        _clipboardWriter = clipboardWriter ?? (dataObject =>
+            Clipboard.SetDataObject(dataObject, true, AppConstants.ClipboardRetryCount, AppConstants.ClipboardRetryDelayMilliseconds));
+    }
+
     public bool TrySetFiles(IReadOnlyList<string> filePaths, string? singleImagePath, out string? errorMessage)
     {
         errorMessage = null;
 
         try
         {
-            var dropList = new StringCollection();
-            dropList.AddRange(filePaths.ToArray());
-
-            var dataObject = new DataObject();
-            dataObject.SetFileDropList(dropList);
-
-            if (filePaths.Count == 1 && !string.IsNullOrWhiteSpace(singleImagePath))
-            {
-                using var sourceImage = Image.FromFile(singleImagePath);
-                using var clipboardImage = new Bitmap(sourceImage);
-                dataObject.SetData(DataFormats.Bitmap, true, clipboardImage);
-                Clipboard.SetDataObject(dataObject, true, AppConstants.ClipboardRetryCount, AppConstants.ClipboardRetryDelayMilliseconds);
-                return true;
-            }
-
-            Clipboard.SetDataObject(dataObject, true, AppConstants.ClipboardRetryCount, AppConstants.ClipboardRetryDelayMilliseconds);
+            var fileDropDataObject = CreateFileDropDataObject(filePaths);
+            _clipboardWriter(fileDropDataObject);
             return true;
         }
         catch (Exception exception)
@@ -35,5 +28,15 @@ public sealed class ClipboardService
             errorMessage = $"Clipboard update failed: {exception.Message}";
             return false;
         }
+    }
+
+    private static DataObject CreateFileDropDataObject(IReadOnlyList<string> filePaths)
+    {
+        var dropList = new StringCollection();
+        dropList.AddRange(filePaths.ToArray());
+
+        var dataObject = new DataObject();
+        dataObject.SetFileDropList(dropList);
+        return dataObject;
     }
 }
