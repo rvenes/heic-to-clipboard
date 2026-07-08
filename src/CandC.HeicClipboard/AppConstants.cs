@@ -25,7 +25,6 @@ public static class AppConstants
     public static readonly TimeSpan BatchMaxWait = TimeSpan.FromSeconds(6);
     public static readonly TimeSpan StandaloneFallbackBudget = TimeSpan.FromSeconds(15);
     public static readonly int[] JpegQualitySteps = [95, 92, 90, 88, 85, 82, 80, 75, 70];
-    public static readonly int[] DownscalePercentSteps = [95, 90, 85, 80, 75, 70, 65, 60];
 
     public static string DefaultTempDirectory => Path.Combine(Path.GetTempPath(), TempFolderName);
 

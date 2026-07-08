@@ -31,19 +31,55 @@ public sealed class HeicConverter : IImageConverter
 
             using var sourceBitmap = LoadSourceBitmap(sourcePath);
             using var baseBitmap = ApplyDimensionCap(sourceBitmap, _conversionOptions);
-            foreach (var attempt in JpegEncodingPlanner.CreateAttempts(_conversionOptions.InitialJpegQuality))
-            {
-                using var candidateBitmap = CreateCandidateBitmap(baseBitmap, attempt.ScalePercent);
-                using var encodedStream = EncodeJpeg(candidateBitmap, attempt.Quality);
 
-                if (encodedStream.Length > _conversionOptions.MaximumBytes)
+            var maximumBytes = _conversionOptions.MaximumBytes;
+            var qualitySteps = JpegEncodingPlanner.CreateQualitySteps(_conversionOptions.InitialJpegQuality);
+            var floorQuality = qualitySteps[^1];
+            long encodedBytes = 0;
+
+            // Phase 1: full scale, descending quality.
+            for (var stepIndex = 0; stepIndex < qualitySteps.Count; stepIndex++)
+            {
+                using var encodedStream = EncodeJpeg(baseBitmap, qualitySteps[stepIndex]);
+                encodedBytes = encodedStream.Length;
+                if (encodedBytes <= maximumBytes)
                 {
-                    continue;
+                    return SaveEncodedJpeg(sourcePath, encodedStream);
                 }
 
-                var outputPath = _tempFileManager.CreateOutputPath(sourcePath);
-                File.WriteAllBytes(outputPath, encodedStream.ToArray());
-                return ConversionResult.Succeeded(sourcePath, outputPath);
+                if (stepIndex == 0 &&
+                    qualitySteps[stepIndex] != floorQuality &&
+                    JpegEncodingPlanner.CanSkipToFloorQuality(encodedBytes, maximumBytes))
+                {
+                    using var floorStream = EncodeJpeg(baseBitmap, floorQuality);
+                    encodedBytes = floorStream.Length;
+                    if (encodedBytes <= maximumBytes)
+                    {
+                        return SaveEncodedJpeg(sourcePath, floorStream);
+                    }
+
+                    break;
+                }
+            }
+
+            // Phase 2: downscale at floor quality, scale estimated from the last size.
+            var scalePercent = 100;
+            for (var attempt = 0; attempt < JpegEncodingPlanner.MaxScaleAttempts; attempt++)
+            {
+                var nextScalePercent = JpegEncodingPlanner.EstimateNextScalePercent(scalePercent, encodedBytes, maximumBytes);
+                if (nextScalePercent is null)
+                {
+                    break;
+                }
+
+                scalePercent = nextScalePercent.Value;
+                using var candidateBitmap = CreateCandidateBitmap(baseBitmap, scalePercent);
+                using var encodedStream = EncodeJpeg(candidateBitmap, floorQuality);
+                encodedBytes = encodedStream.Length;
+                if (encodedBytes <= maximumBytes)
+                {
+                    return SaveEncodedJpeg(sourcePath, encodedStream);
+                }
             }
 
             return ConversionResult.Failed(sourcePath, _conversionOptions.SizeLimitExceededMessage);
@@ -67,6 +103,13 @@ public sealed class HeicConverter : IImageConverter
         {
             return ConversionResult.Failed(sourcePath, exception.Message);
         }
+    }
+
+    private ConversionResult SaveEncodedJpeg(string sourcePath, MemoryStream encodedStream)
+    {
+        var outputPath = _tempFileManager.CreateOutputPath(sourcePath);
+        File.WriteAllBytes(outputPath, encodedStream.ToArray());
+        return ConversionResult.Succeeded(sourcePath, outputPath);
     }
 
     private static Bitmap ApplyDimensionCap(Bitmap sourceBitmap, HeicConversionOptions options)

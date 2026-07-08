@@ -1,29 +1,25 @@
 namespace CandC.HeicClipboard;
 
+/// <summary>
+/// Plans the JPEG encoding attempts in two phases: first descending quality at full
+/// scale (so the common case behaves as before), then downscaling by a scale factor
+/// estimated from the last encoded size. JPEG size is roughly proportional to the
+/// pixel count at a fixed quality, so sqrt(limit/actual) predicts the scale that
+/// lands just under the limit; a safety factor absorbs the approximation error.
+/// </summary>
 public static class JpegEncodingPlanner
 {
-    public static IReadOnlyList<JpegEncodingAttempt> CreateAttempts(int initialQuality)
-    {
-        var attempts = new List<JpegEncodingAttempt>();
-        var qualitySteps = CreateQualitySteps(initialQuality);
+    public const int MaxScaleAttempts = 5;
+    public const int MinimumScalePercent = 1;
 
-        foreach (var quality in qualitySteps)
-        {
-            attempts.Add(new JpegEncodingAttempt(100, quality));
-        }
+    private const double ScaleSafetyFactor = 0.95;
 
-        foreach (var scalePercent in AppConstants.DownscalePercentSteps)
-        {
-            foreach (var quality in qualitySteps)
-            {
-                attempts.Add(new JpegEncodingAttempt(scalePercent, quality));
-            }
-        }
+    // When the first encode overshoots the limit by more than this factor, no
+    // intermediate quality step can close the gap, so jump straight to the
+    // lowest quality instead of grinding through full-resolution encodes.
+    private const int SkipToFloorQualityFactor = 3;
 
-        return attempts;
-    }
-
-    private static IReadOnlyList<int> CreateQualitySteps(int initialQuality)
+    public static IReadOnlyList<int> CreateQualitySteps(int initialQuality)
     {
         var clampedInitialQuality = Math.Clamp(initialQuality, AppConstants.MinimumJpegQuality, AppConstants.MaximumJpegQuality);
         var qualities = new List<int> { clampedInitialQuality };
@@ -38,6 +34,23 @@ public static class JpegEncodingPlanner
 
         return qualities;
     }
-}
 
-public readonly record struct JpegEncodingAttempt(int ScalePercent, int Quality);
+    public static bool CanSkipToFloorQuality(long encodedBytes, long maximumBytes)
+    {
+        return encodedBytes > maximumBytes * SkipToFloorQualityFactor;
+    }
+
+    public static int? EstimateNextScalePercent(int currentScalePercent, long encodedBytes, long maximumBytes)
+    {
+        if (currentScalePercent <= MinimumScalePercent || encodedBytes <= maximumBytes || maximumBytes <= 0)
+        {
+            return null;
+        }
+
+        var ratio = Math.Sqrt(maximumBytes / (double)encodedBytes) * ScaleSafetyFactor;
+        var nextScalePercent = (int)Math.Floor(currentScalePercent * ratio);
+
+        // Always shrink by at least one percent so the attempt sequence terminates.
+        return Math.Clamp(nextScalePercent, MinimumScalePercent, currentScalePercent - 1);
+    }
+}
