@@ -46,7 +46,7 @@ public sealed class HeicConverter
                 return ConversionResult.Succeeded(sourcePath, outputPath);
             }
 
-            return ConversionResult.Failed(sourcePath, "Could not keep the JPEG under 9.8 MB.");
+            return ConversionResult.Failed(sourcePath, _conversionOptions.SizeLimitExceededMessage);
         }
         catch (COMException exception) when (WicCodecProbe.IsMissingHeifCodec(exception))
         {
