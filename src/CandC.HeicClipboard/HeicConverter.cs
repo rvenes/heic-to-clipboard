@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 
 namespace CandC.HeicClipboard;
 
-public sealed class HeicConverter
+public sealed class HeicConverter : IImageConverter
 {
     private static readonly ImageCodecInfo JpegCodec = ImageCodecInfo.GetImageEncoders()
         .Single(static codec => codec.FormatID == ImageFormat.Jpeg.Guid);

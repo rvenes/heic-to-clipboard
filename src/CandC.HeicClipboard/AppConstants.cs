@@ -23,6 +23,7 @@ public static class AppConstants
     public static readonly TimeSpan TempFileMaxAge = TimeSpan.FromDays(DefaultTempCleanupDays);
     public static readonly TimeSpan BatchIdleDelay = TimeSpan.FromMilliseconds(1200);
     public static readonly TimeSpan BatchMaxWait = TimeSpan.FromSeconds(6);
+    public static readonly TimeSpan StandaloneFallbackBudget = TimeSpan.FromSeconds(15);
     public static readonly int[] JpegQualitySteps = [95, 92, 90, 88, 85, 82, 80, 75, 70];
     public static readonly int[] DownscalePercentSteps = [95, 90, 85, 80, 75, 70, 65, 60];
 
