@@ -6,11 +6,13 @@ public static class WicCodecProbe
 {
     private static readonly Guid ImagingFactory2Clsid = new("317D06E8-5F24-433D-BDF7-79CE68D8ABC2");
     private static readonly Guid ImagingFactoryClsid = new("CACAF262-9370-4615-A13B-9F5539DA4C0A");
+    // Only COMPONENTNOTFOUND reliably means the HEIF codec is absent.
+    // UNKNOWNIMAGEFORMAT and COMPONENTINITIALIZEFAILURE are also raised for
+    // corrupt files, so treating them as "missing codec" told users with a
+    // working codec to reinstall it.
     private static readonly HashSet<int> MissingCodecHResults =
     [
-        unchecked((int)0x88982F07),
-        unchecked((int)0x88982F50),
-        unchecked((int)0x88982F8B)
+        unchecked((int)0x88982F50)
     ];
     private static readonly Dictionary<int, string> ErrorNames = new()
     {
