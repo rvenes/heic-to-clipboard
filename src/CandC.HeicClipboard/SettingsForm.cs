@@ -50,8 +50,8 @@ public sealed class SettingsForm : Form
         {
             DecimalPlaces = 1,
             Increment = 0.1m,
-            Minimum = 0.1m,
-            Maximum = 500m,
+            Minimum = AppConstants.MinimumFileSizeMb,
+            Maximum = AppConstants.MaximumFileSizeMb,
             Width = 110
         };
 
@@ -91,8 +91,8 @@ public sealed class SettingsForm : Form
         {
             DecimalPlaces = 0,
             Increment = 1,
-            Minimum = 1,
-            Maximum = 3650,
+            Minimum = AppConstants.MinimumTempCleanupDays,
+            Maximum = AppConstants.MaximumTempCleanupDays,
             Width = 110
         };
 

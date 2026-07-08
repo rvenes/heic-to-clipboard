@@ -7,6 +7,23 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        try
+        {
+            return Run(args);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                $"Unexpected error: {exception.Message}",
+                AppConstants.ApplicationName,
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+            return 1;
+        }
+    }
+
+    private static int Run(string[] args)
+    {
         Application.SetHighDpiMode(HighDpiMode.SystemAware);
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);

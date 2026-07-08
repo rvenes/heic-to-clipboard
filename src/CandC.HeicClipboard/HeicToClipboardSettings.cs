@@ -27,11 +27,13 @@ public sealed class HeicToClipboardSettings
         {
             UseCustomOutputFolder = UseCustomOutputFolder,
             CustomOutputFolder = (CustomOutputFolder ?? string.Empty).Trim(),
-            MaxFileSizeMb = MaxFileSizeMb > 0 ? MaxFileSizeMb : AppConstants.DefaultMaximumFileSizeMb,
+            MaxFileSizeMb = MaxFileSizeMb > 0
+                ? Math.Clamp(MaxFileSizeMb, AppConstants.MinimumFileSizeMb, AppConstants.MaximumFileSizeMb)
+                : AppConstants.DefaultMaximumFileSizeMb,
             InitialJpegQuality = Math.Clamp(InitialJpegQuality, AppConstants.MinimumJpegQuality, AppConstants.MaximumJpegQuality),
             KeepOriginalResolution = keepOriginalResolution,
             MaxLongestSidePx = maxLongestSidePx,
-            TempCleanupDays = TempCleanupDays >= 1 ? TempCleanupDays : AppConstants.DefaultTempCleanupDays
+            TempCleanupDays = Math.Clamp(TempCleanupDays, AppConstants.MinimumTempCleanupDays, AppConstants.MaximumTempCleanupDays)
         };
     }
 }

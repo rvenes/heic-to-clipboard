@@ -13,10 +13,14 @@ public static class AppConstants
     public const int ClipboardRetryCount = 10;
     public const int ClipboardRetryDelayMilliseconds = 100;
     public const decimal DefaultMaximumFileSizeMb = 9.8m;
+    public const decimal MinimumFileSizeMb = 0.1m;
+    public const decimal MaximumFileSizeMb = 500m;
     public const int DefaultInitialJpegQuality = 95;
     public const int MinimumJpegQuality = 70;
     public const int MaximumJpegQuality = 100;
     public const int DefaultTempCleanupDays = 1;
+    public const int MinimumTempCleanupDays = 1;
+    public const int MaximumTempCleanupDays = 3650;
     public static readonly long MaximumJpegBytes = ToBytes(DefaultMaximumFileSizeMb);
     public static readonly TimeSpan TempFileMaxAge = TimeSpan.FromDays(DefaultTempCleanupDays);
     public static readonly TimeSpan BatchIdleDelay = TimeSpan.FromMilliseconds(1200);
