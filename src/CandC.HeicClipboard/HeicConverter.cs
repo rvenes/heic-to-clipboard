@@ -50,7 +50,14 @@ public sealed class HeicConverter
         }
         catch (COMException exception) when (WicCodecProbe.IsMissingHeifCodec(exception))
         {
-            return ConversionResult.Failed(sourcePath, AppConstants.MissingHeifSupportMessage);
+            // WIC raises COMPONENTNOTFOUND both when the HEIF codec is absent and
+            // when no codec recognizes the file content, so check the file header
+            // before telling the user to install the codec.
+            return ConversionResult.Failed(
+                sourcePath,
+                HeifSignature.FileLooksLikeHeif(sourcePath)
+                    ? AppConstants.MissingHeifSupportMessage
+                    : "Not a valid HEIC/HEIF file (unrecognized file header).");
         }
         catch (COMException exception)
         {
