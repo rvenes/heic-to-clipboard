@@ -29,8 +29,7 @@ public sealed class BatchProcessor
             return new BatchProcessResult(results, clipboardUpdated: false, clipboardError: null);
         }
 
-        var singleImagePath = successfulFiles.Length == 1 ? successfulFiles[0] : null;
-        var clipboardUpdated = _clipboardService.TrySetFiles(successfulFiles, singleImagePath, out var clipboardError);
+        var clipboardUpdated = _clipboardService.TrySetFiles(successfulFiles, out var clipboardError);
 
         return new BatchProcessResult(results, clipboardUpdated, clipboardError);
     }

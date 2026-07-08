@@ -2,11 +2,6 @@ namespace CandC.HeicClipboard;
 
 public static class JpegEncodingPlanner
 {
-    public static IReadOnlyList<JpegEncodingAttempt> CreateAttempts()
-    {
-        return CreateAttempts(AppConstants.DefaultInitialJpegQuality);
-    }
-
     public static IReadOnlyList<JpegEncodingAttempt> CreateAttempts(int initialQuality)
     {
         var attempts = new List<JpegEncodingAttempt>();
@@ -26,24 +21,6 @@ public static class JpegEncodingPlanner
         }
 
         return attempts;
-    }
-
-    public static JpegEncodingAttempt? SelectFirstWithinLimit(Func<JpegEncodingAttempt, long> sizeEvaluator, long maximumBytes)
-    {
-        return SelectFirstWithinLimit(sizeEvaluator, maximumBytes, AppConstants.DefaultInitialJpegQuality);
-    }
-
-    public static JpegEncodingAttempt? SelectFirstWithinLimit(Func<JpegEncodingAttempt, long> sizeEvaluator, long maximumBytes, int initialQuality)
-    {
-        foreach (var attempt in CreateAttempts(initialQuality))
-        {
-            if (sizeEvaluator(attempt) <= maximumBytes)
-            {
-                return attempt;
-            }
-        }
-
-        return null;
     }
 
     private static IReadOnlyList<int> CreateQualitySteps(int initialQuality)

@@ -3,7 +3,6 @@ namespace CandC.HeicClipboard;
 public static class AppConstants
 {
     public const string ApplicationName = "HeicToClipboard";
-    public const string ContextMenuText = "C&C to JPEG";
     public const string MissingHeifSupportMessage = "HEIF/HEIC support is missing in Windows. Install HEIF Image Extensions from Microsoft Store.";
     public const string SettingsFileName = "settings.json";
     public const string TempFolderName = "HeicClipboardConvert";
@@ -21,7 +20,6 @@ public static class AppConstants
     public const int DefaultTempCleanupDays = 1;
     public const int MinimumTempCleanupDays = 1;
     public const int MaximumTempCleanupDays = 3650;
-    public static readonly long MaximumJpegBytes = ToBytes(DefaultMaximumFileSizeMb);
     public static readonly TimeSpan TempFileMaxAge = TimeSpan.FromDays(DefaultTempCleanupDays);
     public static readonly TimeSpan BatchIdleDelay = TimeSpan.FromMilliseconds(1200);
     public static readonly TimeSpan BatchMaxWait = TimeSpan.FromSeconds(6);
