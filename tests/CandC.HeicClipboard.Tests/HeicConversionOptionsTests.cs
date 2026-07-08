@@ -21,6 +21,14 @@ public sealed class HeicConversionOptionsTests
     }
 
     [Fact]
+    public void SizeLimitExceededMessage_FallsBackToBytesForTinyLimits()
+    {
+        var options = new HeicConversionOptions(300, 95, true, null);
+
+        Assert.Equal("Could not keep the JPEG under 300 bytes.", options.SizeLimitExceededMessage);
+    }
+
+    [Fact]
     public void SizeLimitExceededMessage_UsesInvariantDecimalSeparator()
     {
         var settings = new HeicToClipboardSettings { MaxFileSizeMb = 0.5m };
