@@ -61,7 +61,8 @@ foreach ($registryPath in $registryTargets) {
     New-Item -Path $registryPath -Force | Out-Null
     New-Item -Path $commandPath -Force | Out-Null
 
-    Set-Item -Path $registryPath -Value 'C&C to JPEG'
+    # && because a single & is the menu accelerator prefix and would render as "CC to JPEG"
+    Set-Item -Path $registryPath -Value 'C&&C to JPEG'
     Set-ItemProperty -Path $registryPath -Name 'Icon' -Value $installedExe
     Set-ItemProperty -Path $registryPath -Name 'MultiSelectModel' -Value 'Player'
     Set-Item -Path $commandPath -Value $commandValue

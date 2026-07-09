@@ -7,6 +7,23 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        try
+        {
+            return Run(args);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                $"Unexpected error: {exception.Message}",
+                AppConstants.ApplicationName,
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+            return 1;
+        }
+    }
+
+    private static int Run(string[] args)
+    {
         Application.SetHighDpiMode(HighDpiMode.SystemAware);
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
@@ -20,8 +37,14 @@ internal static class Program
             return 0;
         }
 
-        var invocationBatch = InvocationCoordinator.Collect(args);
-        if (invocationBatch.ShouldExitCurrentInstance || invocationBatch.Files.Count == 0)
+        var normalizedFiles = FileSelectionNormalizer.Normalize(args);
+        if (normalizedFiles.Count == 0)
+        {
+            return 0;
+        }
+
+        using var coordinator = InvocationCoordinator.CreateDefault();
+        if (coordinator.CollectOrForward(normalizedFiles) == CoordinatorRole.Forwarded)
         {
             return 0;
         }
@@ -32,7 +55,11 @@ internal static class Program
         tempFileManager.CleanupExpiredFiles();
 
         var processor = new BatchProcessor(new HeicConverter(tempFileManager, HeicConversionOptions.FromSettings(settings)), new ClipboardService());
-        var result = processor.Process(invocationBatch.Files);
+        var result = processor.Process(coordinator);
+
+        // Release the mutex and pipe before any modal summary, so a new invocation
+        // made while the dialog is open can start its own batch.
+        coordinator.Dispose();
 
         if (result.ShouldShowMessage)
         {

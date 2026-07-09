@@ -13,7 +13,7 @@ public sealed class ClipboardService
             Clipboard.SetDataObject(dataObject, true, AppConstants.ClipboardRetryCount, AppConstants.ClipboardRetryDelayMilliseconds));
     }
 
-    public bool TrySetFiles(IReadOnlyList<string> filePaths, string? singleImagePath, out string? errorMessage)
+    public bool TrySetFiles(IReadOnlyList<string> filePaths, out string? errorMessage)
     {
         errorMessage = null;
 

@@ -3,7 +3,6 @@ namespace CandC.HeicClipboard;
 public static class AppConstants
 {
     public const string ApplicationName = "HeicToClipboard";
-    public const string ContextMenuText = "C&C to JPEG";
     public const string MissingHeifSupportMessage = "HEIF/HEIC support is missing in Windows. Install HEIF Image Extensions from Microsoft Store.";
     public const string SettingsFileName = "settings.json";
     public const string TempFolderName = "HeicClipboardConvert";
@@ -13,16 +12,19 @@ public static class AppConstants
     public const int ClipboardRetryCount = 10;
     public const int ClipboardRetryDelayMilliseconds = 100;
     public const decimal DefaultMaximumFileSizeMb = 9.8m;
+    public const decimal MinimumFileSizeMb = 0.1m;
+    public const decimal MaximumFileSizeMb = 500m;
     public const int DefaultInitialJpegQuality = 95;
     public const int MinimumJpegQuality = 70;
     public const int MaximumJpegQuality = 100;
     public const int DefaultTempCleanupDays = 1;
-    public static readonly long MaximumJpegBytes = ToBytes(DefaultMaximumFileSizeMb);
+    public const int MinimumTempCleanupDays = 1;
+    public const int MaximumTempCleanupDays = 3650;
     public static readonly TimeSpan TempFileMaxAge = TimeSpan.FromDays(DefaultTempCleanupDays);
     public static readonly TimeSpan BatchIdleDelay = TimeSpan.FromMilliseconds(1200);
     public static readonly TimeSpan BatchMaxWait = TimeSpan.FromSeconds(6);
+    public static readonly TimeSpan StandaloneFallbackBudget = TimeSpan.FromSeconds(15);
     public static readonly int[] JpegQualitySteps = [95, 92, 90, 88, 85, 82, 80, 75, 70];
-    public static readonly int[] DownscalePercentSteps = [95, 90, 85, 80, 75, 70, 65, 60];
 
     public static string DefaultTempDirectory => Path.Combine(Path.GetTempPath(), TempFolderName);
 
