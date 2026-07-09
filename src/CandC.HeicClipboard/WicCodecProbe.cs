@@ -94,6 +94,13 @@ internal enum WICBitmapPaletteType
     WICBitmapPaletteTypeCustom = 0
 }
 
+internal enum WICColorContextType : uint
+{
+    WICColorContextUninitialized = 0,
+    WICColorContextProfile = 1,
+    WICColorContextExifColorSpace = 2
+}
+
 [ComImport]
 [Guid("EC5EC8A9-C395-4314-9C77-54D7A935FF70")]
 [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
@@ -119,6 +126,65 @@ internal interface IWICImagingFactory
     void CreatePalette(out IntPtr palette);
 
     void CreateFormatConverter(out IWICFormatConverter formatConverter);
+
+    // The following methods must be declared in the exact vtable order from
+    // wincodec.h; the IntPtr-typed ones are placeholders that are never called
+    // but keep CreateColorContext and CreateColorTransformer on the right slots.
+    void CreateBitmapScaler(out IntPtr bitmapScaler);
+
+    void CreateBitmapClipper(out IntPtr bitmapClipper);
+
+    void CreateBitmapFlipRotator(out IntPtr bitmapFlipRotator);
+
+    void CreateStream(out IntPtr stream);
+
+    void CreateColorContext(out IWICColorContext colorContext);
+
+    void CreateColorTransformer(out IWICColorTransform colorTransform);
+}
+
+[ComImport]
+[Guid("3C613A02-34B2-44EA-9A7C-45AEA9C6FD6D")]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+internal interface IWICColorContext
+{
+    void InitializeFromFilename([MarshalAs(UnmanagedType.LPWStr)] string fileName);
+
+    void InitializeFromMemory([In, MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 1)] byte[] profileBytes, uint byteCount);
+
+    void InitializeFromExifColorSpace(uint value);
+
+    void GetType(out WICColorContextType type);
+
+    void GetProfileBytes(uint bufferSize, [Out, MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 0)] byte[]? buffer, out uint actualByteCount);
+
+    void GetExifColorSpace(out uint value);
+}
+
+[ComImport]
+[Guid("B66F034F-D0E2-40AB-B436-6DE39E321A94")]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+internal interface IWICColorTransform : IWICBitmapSource
+{
+    new void GetSize(out uint width, out uint height);
+
+    new void GetPixelFormat(out Guid pixelFormat);
+
+    new void GetResolution(out double dpiX, out double dpiY);
+
+    new void CopyPalette(IntPtr palette);
+
+    new void CopyPixels(
+        IntPtr prc,
+        uint cbStride,
+        uint cbBufferSize,
+        [Out, MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 2)] byte[] pixels);
+
+    void Initialize(
+        [MarshalAs(UnmanagedType.Interface)] IWICBitmapSource bitmapSource,
+        [MarshalAs(UnmanagedType.Interface)] IWICColorContext sourceContext,
+        [MarshalAs(UnmanagedType.Interface)] IWICColorContext destinationContext,
+        ref Guid destinationPixelFormat);
 }
 
 [ComImport]
@@ -162,7 +228,10 @@ internal interface IWICBitmapFrameDecode : IWICBitmapSource
 
     void GetMetadataQueryReader(out IWICMetadataQueryReader metadataQueryReader);
 
-    void GetColorContexts(uint colorContextCount, IntPtr colorContexts, out uint actualCount);
+    void GetColorContexts(
+        uint colorContextCount,
+        [In, Out, MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.Interface, SizeParamIndex = 0)] IWICColorContext[]? colorContexts,
+        out uint actualCount);
 
     void GetThumbnail(out IntPtr thumbnail);
 }

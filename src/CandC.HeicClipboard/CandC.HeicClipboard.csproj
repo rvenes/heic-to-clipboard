@@ -15,4 +15,8 @@
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="CandC.HeicClipboard.Tests" />
+  </ItemGroup>
 </Project>
