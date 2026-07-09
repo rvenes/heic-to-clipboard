@@ -51,4 +51,64 @@ public sealed class WicColorInteropTests
             WicCodecProbe.ReleaseComObject(factory);
         }
     }
+
+    [Fact]
+    public void GetColorContexts_CanBeCalledOnLocalHeicFrame()
+    {
+        var samplePath = LocalHeicSamples.GetFiles().FirstOrDefault();
+        if (samplePath is null)
+        {
+            return;
+        }
+
+        IWICBitmapDecoder? decoder = null;
+        IWICBitmapFrameDecode? frame = null;
+        var colorContexts = new List<IWICColorContext>();
+        var factory = WicCodecProbe.CreateImagingFactory();
+        try
+        {
+            factory.CreateDecoderFromFilename(
+                samplePath,
+                IntPtr.Zero,
+                WicCodecProbe.GenericReadAccess,
+                WICDecodeOptions.WICDecodeMetadataCacheOnLoad,
+                out decoder);
+
+            decoder.GetFrame(0, out frame);
+            frame.GetColorContexts(0, null, out var contextCount);
+
+            if (contextCount == 0)
+            {
+                return;
+            }
+
+            for (var index = 0; index < contextCount; index++)
+            {
+                factory.CreateColorContext(out var colorContext);
+                colorContexts.Add(colorContext);
+            }
+
+            frame.GetColorContexts(contextCount, colorContexts.ToArray(), out var actualCount);
+
+            Assert.Equal(contextCount, actualCount);
+            foreach (var colorContext in colorContexts)
+            {
+                colorContext.GetType(out var type);
+                Assert.True(
+                    type is WICColorContextType.WICColorContextProfile or WICColorContextType.WICColorContextExifColorSpace,
+                    $"Unexpected color context type: {type}");
+            }
+        }
+        finally
+        {
+            foreach (var colorContext in colorContexts)
+            {
+                WicCodecProbe.ReleaseComObject(colorContext);
+            }
+
+            WicCodecProbe.ReleaseComObject(frame);
+            WicCodecProbe.ReleaseComObject(decoder);
+            WicCodecProbe.ReleaseComObject(factory);
+        }
+    }
 }
