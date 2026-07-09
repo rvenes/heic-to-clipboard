@@ -138,6 +138,7 @@ public sealed class HeicConverter : IImageConverter
         IWICBitmapDecoder? decoder = null;
         IWICBitmapFrameDecode? frame = null;
         IWICFormatConverter? formatConverter = null;
+        var colorResources = new List<object>();
 
         try
         {
@@ -150,19 +151,32 @@ public sealed class HeicConverter : IImageConverter
                 out decoder);
 
             decoder.GetFrame(0, out frame);
-            factory.CreateFormatConverter(out formatConverter);
-
-            var targetPixelFormat = WicCodecProbe.PixelFormat32bppBGRA;
-            formatConverter.Initialize(
-                frame,
-                ref targetPixelFormat,
-                WICBitmapDitherType.WICBitmapDitherTypeNone,
-                null,
-                0d,
-                WICBitmapPaletteType.WICBitmapPaletteTypeCustom);
-
             var orientation = GetOrientation(frame);
-            var bitmap = ConvertToBitmap(formatConverter);
+
+            // Convert embedded color profiles (e.g. iPhone Display P3) to sRGB, so
+            // consumers that treat untagged JPEG as sRGB show correct colors. Any
+            // failure falls back to the plain format-converter path used before.
+            IWICBitmapSource pixelSource;
+            var transformedSource = TryCreateSrgbTransformedSource(factory, frame, colorResources);
+            if (transformedSource is not null)
+            {
+                pixelSource = transformedSource;
+            }
+            else
+            {
+                factory.CreateFormatConverter(out formatConverter);
+                var targetPixelFormat = WicCodecProbe.PixelFormat32bppBGRA;
+                formatConverter.Initialize(
+                    frame,
+                    ref targetPixelFormat,
+                    WICBitmapDitherType.WICBitmapDitherTypeNone,
+                    null,
+                    0d,
+                    WICBitmapPaletteType.WICBitmapPaletteTypeCustom);
+                pixelSource = formatConverter;
+            }
+
+            var bitmap = ConvertToBitmap(pixelSource);
             try
             {
                 ApplyOrientation(bitmap, orientation);
@@ -176,10 +190,88 @@ public sealed class HeicConverter : IImageConverter
         }
         finally
         {
+            foreach (var colorResource in colorResources)
+            {
+                WicCodecProbe.ReleaseComObject(colorResource);
+            }
+
             WicCodecProbe.ReleaseComObject(formatConverter);
             WicCodecProbe.ReleaseComObject(frame);
             WicCodecProbe.ReleaseComObject(decoder);
             WicCodecProbe.ReleaseComObject(factory);
+        }
+    }
+
+    // Returns a bitmap source that outputs sRGB pixels, or null when the file has no
+    // usable embedded profile (or the transform cannot be built), in which case the
+    // caller must use the ordinary format-converter path. Created COM objects are
+    // added to colorResources; the caller releases them after the pixels are copied.
+    private static IWICBitmapSource? TryCreateSrgbTransformedSource(
+        IWICImagingFactory factory,
+        IWICBitmapFrameDecode frame,
+        List<object> colorResources)
+    {
+        try
+        {
+            frame.GetColorContexts(0, null, out var contextCount);
+            if (contextCount == 0)
+            {
+                return null;
+            }
+
+            var colorContexts = new IWICColorContext[contextCount];
+            for (var index = 0; index < colorContexts.Length; index++)
+            {
+                factory.CreateColorContext(out colorContexts[index]);
+                colorResources.Add(colorContexts[index]);
+            }
+
+            frame.GetColorContexts(contextCount, colorContexts, out _);
+
+            IWICColorContext? sourceContext = null;
+            foreach (var colorContext in colorContexts)
+            {
+                colorContext.GetType(out var contextType);
+                if (contextType == WICColorContextType.WICColorContextProfile)
+                {
+                    sourceContext = colorContext;
+                    break;
+                }
+
+                if (contextType == WICColorContextType.WICColorContextExifColorSpace)
+                {
+                    colorContext.GetExifColorSpace(out var exifColorSpace);
+                    if (exifColorSpace == 1)
+                    {
+                        // Already tagged as sRGB; the ordinary path is correct as-is.
+                        return null;
+                    }
+                }
+            }
+
+            if (sourceContext is null)
+            {
+                return null;
+            }
+
+            factory.CreateColorContext(out var srgbContext);
+            colorResources.Add(srgbContext);
+            srgbContext.InitializeFromExifColorSpace(1);
+
+            factory.CreateColorTransformer(out var colorTransform);
+            colorResources.Add(colorTransform);
+
+            var targetPixelFormat = WicCodecProbe.PixelFormat32bppBGRA;
+            colorTransform.Initialize(frame, sourceContext, srgbContext, ref targetPixelFormat);
+            return colorTransform;
+        }
+        catch (COMException)
+        {
+            return null;
+        }
+        catch (InvalidCastException)
+        {
+            return null;
         }
     }
 
