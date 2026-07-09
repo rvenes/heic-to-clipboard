@@ -8,7 +8,7 @@ It converts the selected images to JPEG and places them on the clipboard so they
 
 No permanent JPEG files are written next to the originals.
 
-If you start `HeicToClipboard.exe` directly, it opens a small settings window where you can change output folder, max file size, JPEG quality, and optional resolution cap.
+If you start `HeicToClipboard.exe` directly, it opens a small settings window where you can change output folder, max file size, JPEG quality, optional resolution cap, and how long temporary files are kept.
 
 ---
 
@@ -60,6 +60,10 @@ the app opens its settings window instead of converting files.
 ## What the tool does
 
 - Converts HEIC / HEIF → JPEG
+- Handles selections of many files at once: all selected images end up together in one clipboard batch, even when Explorer starts the conversions with a delay
+- Converts wide-gamut photos (for example iPhone Display P3) to standard sRGB, so colors look right when pasted into apps that expect plain JPEG
+- Picks the highest JPEG quality that fits under the size limit, and downscales efficiently when the limit is small
+- Shows a clear error message for invalid or corrupt files, and a separate hint when the Windows HEIF codec is missing
 - Uses these default settings out of the box:
   - JPEG quality starts at 95
   - maximum file size target is **9.8 MB per file**
@@ -74,7 +78,7 @@ the app opens its settings window instead of converting files.
 
 %TEMP%\HeicClipboardConvert
 
-Temporary files older than 24 hours are cleaned automatically when temp-folder mode is active.
+Temporary files are cleaned automatically when temp-folder mode is active. The default age is 24 hours and can be changed in the settings window.
 
 ---
 
@@ -88,6 +92,18 @@ The application never uploads files.
 By default it writes generated JPEG files to the local temp folder and cleans up its own old temp files automatically.
 
 If you choose a custom output folder in settings, files are written there instead, including network locations if you select one.
+
+---
+
+## Development
+
+Build and test locally with:
+
+    .\build.ps1
+
+This restores, builds, runs the test suite, and publishes a self-contained exe to `artifacts\publish\win-x64`.
+
+A few integration tests decode real HEIC files from a local sample folder. They are skipped automatically when the folder or the Windows HEIF codec is not available, so the test suite passes on any machine.
 
 ---
 
