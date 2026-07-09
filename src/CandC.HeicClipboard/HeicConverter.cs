@@ -30,7 +30,8 @@ public sealed class HeicConverter : IImageConverter
             }
 
             using var sourceBitmap = LoadSourceBitmap(sourcePath);
-            using var baseBitmap = ApplyDimensionCap(sourceBitmap, _conversionOptions);
+            using var dimensionCappedBitmap = TryCreateDimensionCappedBitmap(sourceBitmap, _conversionOptions);
+            var baseBitmap = dimensionCappedBitmap ?? sourceBitmap;
 
             var maximumBytes = _conversionOptions.MaximumBytes;
             var qualitySteps = JpegEncodingPlanner.CreateQualitySteps(_conversionOptions.InitialJpegQuality);
@@ -99,21 +100,33 @@ public sealed class HeicConverter : IImageConverter
     private ConversionResult SaveEncodedJpeg(string sourcePath, MemoryStream encodedStream)
     {
         var outputPath = _tempFileManager.CreateOutputPath(sourcePath);
-        File.WriteAllBytes(outputPath, encodedStream.ToArray());
+        using var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
+        if (encodedStream.TryGetBuffer(out var buffer))
+        {
+            fileStream.Write(buffer.Array!, buffer.Offset, buffer.Count);
+        }
+        else
+        {
+            encodedStream.Position = 0;
+            encodedStream.CopyTo(fileStream);
+        }
+
         return ConversionResult.Succeeded(sourcePath, outputPath);
     }
 
-    private static Bitmap ApplyDimensionCap(Bitmap sourceBitmap, HeicConversionOptions options)
+    // Returns null when no resize is needed, so the caller keeps using the source
+    // bitmap directly instead of paying for a full-size clone.
+    private static Bitmap? TryCreateDimensionCappedBitmap(Bitmap sourceBitmap, HeicConversionOptions options)
     {
         if (options.KeepOriginalResolution)
         {
-            return (Bitmap)sourceBitmap.Clone();
+            return null;
         }
 
         var fitted = ImageResizePlanner.FitWithinLongestSide(sourceBitmap.Width, sourceBitmap.Height, options.MaxLongestSidePx);
         if (fitted.Width == sourceBitmap.Width && fitted.Height == sourceBitmap.Height)
         {
-            return (Bitmap)sourceBitmap.Clone();
+            return null;
         }
 
         return ResizeBitmap(sourceBitmap, fitted.Width, fitted.Height);
@@ -149,9 +162,17 @@ public sealed class HeicConverter : IImageConverter
                 WICBitmapPaletteType.WICBitmapPaletteTypeCustom);
 
             var orientation = GetOrientation(frame);
-            using var bitmap = ConvertToBitmap(formatConverter);
-            ApplyOrientation(bitmap, orientation);
-            return (Bitmap)bitmap.Clone();
+            var bitmap = ConvertToBitmap(formatConverter);
+            try
+            {
+                ApplyOrientation(bitmap, orientation);
+                return bitmap;
+            }
+            catch
+            {
+                bitmap.Dispose();
+                throw;
+            }
         }
         finally
         {
