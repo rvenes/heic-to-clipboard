@@ -44,7 +44,8 @@ public sealed class HeicConverterTests
     [Fact]
     public void Convert_LocalHeicSamples_WritesReadableJpegsWithOrientedDimensions()
     {
-        var samplePaths = LocalHeicSamples.GetFiles();
+        // Empty when the sample folder is missing or the HEIF codec is absent.
+        var samplePaths = LocalHeicSamples.GetDecodableFiles();
         if (samplePaths.Count == 0)
         {
             return;
@@ -83,7 +84,8 @@ public sealed class HeicConverterTests
     [Fact]
     public void Convert_LocalHeicSamples_KeepsJpegsUnderPointFifteenMb()
     {
-        var samplePaths = LocalHeicSamples.GetFiles();
+        // Empty when the sample folder is missing or the HEIF codec is absent.
+        var samplePaths = LocalHeicSamples.GetDecodableFiles();
         if (samplePaths.Count == 0)
         {
             return;

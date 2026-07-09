@@ -55,7 +55,8 @@ public sealed class WicColorInteropTests
     [Fact]
     public void GetColorContexts_CanBeCalledOnLocalHeicFrame()
     {
-        var samplePath = LocalHeicSamples.GetFiles().FirstOrDefault();
+        // Null when the sample folder is missing or the HEIF codec is absent.
+        var samplePath = LocalHeicSamples.GetDecodableFiles().FirstOrDefault();
         if (samplePath is null)
         {
             return;
