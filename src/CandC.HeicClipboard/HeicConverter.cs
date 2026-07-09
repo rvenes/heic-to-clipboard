@@ -37,28 +37,19 @@ public sealed class HeicConverter : IImageConverter
             var floorQuality = qualitySteps[^1];
             long encodedBytes = 0;
 
-            // Phase 1: full scale, descending quality.
-            for (var stepIndex = 0; stepIndex < qualitySteps.Count; stepIndex++)
+            // Phase 1: walk the complete quality ladder at full scale, so the result
+            // always uses the highest quality that fits. Full-scale attempts go through
+            // the same candidate normalization (24bpp, white-composited) as scaled ones.
+            using (var fullScaleBitmap = CreateCandidateBitmap(baseBitmap, 100))
             {
-                using var encodedStream = EncodeJpeg(baseBitmap, qualitySteps[stepIndex]);
-                encodedBytes = encodedStream.Length;
-                if (encodedBytes <= maximumBytes)
+                foreach (var quality in qualitySteps)
                 {
-                    return SaveEncodedJpeg(sourcePath, encodedStream);
-                }
-
-                if (stepIndex == 0 &&
-                    qualitySteps[stepIndex] != floorQuality &&
-                    JpegEncodingPlanner.CanSkipToFloorQuality(encodedBytes, maximumBytes))
-                {
-                    using var floorStream = EncodeJpeg(baseBitmap, floorQuality);
-                    encodedBytes = floorStream.Length;
+                    using var encodedStream = EncodeJpeg(fullScaleBitmap, quality);
+                    encodedBytes = encodedStream.Length;
                     if (encodedBytes <= maximumBytes)
                     {
-                        return SaveEncodedJpeg(sourcePath, floorStream);
+                        return SaveEncodedJpeg(sourcePath, encodedStream);
                     }
-
-                    break;
                 }
             }
 
@@ -271,7 +262,7 @@ public sealed class HeicConverter : IImageConverter
         image.RotateFlip(rotateFlipType);
     }
 
-    private static Bitmap CreateCandidateBitmap(Bitmap sourceBitmap, int scalePercent)
+    public static Bitmap CreateCandidateBitmap(Bitmap sourceBitmap, int scalePercent)
     {
         var width = Math.Max(1, (int)Math.Round(sourceBitmap.Width * (scalePercent / 100d)));
         var height = Math.Max(1, (int)Math.Round(sourceBitmap.Height * (scalePercent / 100d)));

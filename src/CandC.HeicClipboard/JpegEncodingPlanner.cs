@@ -14,11 +14,6 @@ public static class JpegEncodingPlanner
 
     private const double ScaleSafetyFactor = 0.95;
 
-    // When the first encode overshoots the limit by more than this factor, no
-    // intermediate quality step can close the gap, so jump straight to the
-    // lowest quality instead of grinding through full-resolution encodes.
-    private const int SkipToFloorQualityFactor = 3;
-
     public static IReadOnlyList<int> CreateQualitySteps(int initialQuality)
     {
         var clampedInitialQuality = Math.Clamp(initialQuality, AppConstants.MinimumJpegQuality, AppConstants.MaximumJpegQuality);
@@ -33,11 +28,6 @@ public static class JpegEncodingPlanner
         }
 
         return qualities;
-    }
-
-    public static bool CanSkipToFloorQuality(long encodedBytes, long maximumBytes)
-    {
-        return encodedBytes > maximumBytes * SkipToFloorQualityFactor;
     }
 
     public static int? EstimateNextScalePercent(int currentScalePercent, long encodedBytes, long maximumBytes)

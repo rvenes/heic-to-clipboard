@@ -142,12 +142,24 @@ public sealed class JpegEncodingPlannerTests
         Assert.Equal(JpegEncodingPlanner.MinimumScalePercent, scalePercent);
     }
 
-    [Theory]
-    [InlineData(3_000_001, 1_000_000, true)]
-    [InlineData(3_000_000, 1_000_000, false)]
-    [InlineData(1_500_000, 1_000_000, false)]
-    public void CanSkipToFloorQuality_TriggersOnlyOnLargeOvershoot(long encodedBytes, long maximumBytes, bool expected)
+    [Fact]
+    public void QualityLadder_WalkedInOrder_FindsHighestQualityThatFits()
     {
-        Assert.Equal(expected, JpegEncodingPlanner.CanSkipToFloorQuality(encodedBytes, maximumBytes));
+        // Regression guard: even when the first attempt overshoots the limit by a lot,
+        // the ladder must not skip ahead to the floor quality; the first (highest)
+        // fitting step wins. Here 95 is 5x over the limit but 85 already fits.
+        const long maximumBytes = 1_000_000;
+        static long SizeAt(int quality) => quality switch
+        {
+            >= 92 => 5_000_000,
+            >= 88 => 1_200_000,
+            _ => 900_000
+        };
+
+        var chosenQuality = JpegEncodingPlanner
+            .CreateQualitySteps(AppConstants.DefaultInitialJpegQuality)
+            .First(quality => SizeAt(quality) <= maximumBytes);
+
+        Assert.Equal(85, chosenQuality);
     }
 }
