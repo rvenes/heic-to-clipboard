@@ -22,6 +22,8 @@ public sealed class SettingsForm : Form
     private readonly CancellationTokenSource _updateCancellation = new();
     private readonly Label _updateStatusLabel;
     private readonly Button _installUpdateButton;
+    private TableLayoutPanel? _rootLayout;
+    private FlowLayoutPanel? _buttonsPanel;
     private UpdateManifest? _availableUpdate;
     private bool _updateInProgress;
 
@@ -30,14 +32,13 @@ public sealed class SettingsForm : Form
         _settingsStore = settingsStore;
         _tempDirectory = tempDirectory;
 
-        Text = $"{AppConstants.ApplicationName} Settings";
+        Text = $"{AppConstants.ApplicationName} Settings – v{UpdateService.CurrentVersion}";
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = true;
         ClientSize = new Size(780, 640);
-        MinimumSize = new Size(780, 640);
 
         _tempFolderTextBox = CreateReadOnlyTextBox();
         _useCustomFolderCheckBox = new CheckBox
@@ -122,11 +123,28 @@ public sealed class SettingsForm : Form
         FormClosed += (_, _) => _updateCancellation.Cancel();
     }
 
+    // The dialog height is computed from the actual content once fonts and DPI
+    // scaling are applied, so no group is clipped at higher display scales.
+    protected override void OnLoad(EventArgs e)
+    {
+        base.OnLoad(e);
+
+        if (_rootLayout is null || _buttonsPanel is null)
+        {
+            return;
+        }
+
+        var contentHeight = _rootLayout.GetPreferredSize(new Size(_rootLayout.Width, 0)).Height;
+        ClientSize = new Size(ClientSize.Width, contentHeight + _buttonsPanel.Height);
+        CenterToScreen();
+    }
+
     private void BuildLayout()
     {
         var buttonsPanel = BuildButtonsPanel();
         buttonsPanel.Dock = DockStyle.Bottom;
         Controls.Add(buttonsPanel);
+        _buttonsPanel = buttonsPanel;
 
         var root = new TableLayoutPanel
         {
@@ -141,6 +159,7 @@ public sealed class SettingsForm : Form
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         Controls.Add(root);
+        _rootLayout = root;
 
         var introLabel = new Label
         {

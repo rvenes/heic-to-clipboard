@@ -4,7 +4,14 @@ All notable changes to HeicToClipboard are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.3.0] - Unreleased
+## [0.3.1] - 2026-07-12
+
+### Fixed
+
+- The Updates section was clipped out of view in the settings window at higher display scaling; the window now sizes itself to its content.
+- The installed version is now shown in the settings window title bar.
+
+## [0.3.0] - 2026-07-12
 
 ### Added
 
