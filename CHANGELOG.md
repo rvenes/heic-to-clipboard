@@ -4,6 +4,14 @@ All notable changes to HeicToClipboard are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0] - Unreleased
+
+### Added
+
+- Automatic update check: opening the app manually (the settings window) checks https://venes.org/heictoclipboard/ for a new version and offers to download and install it. The download is verified with a SHA-256 checksum before the installed exe is swapped and the app restarts.
+- New Updates section in the settings window showing the installed version and update status.
+- Download page and web installer at https://venes.org/heictoclipboard/ (`site/index.html`, `site/install.ps1`), plus `release.ps1` for staging and publishing releases with a `latest.json` update feed.
+
 ## [0.2.0] - 2026-07-09
 
 ### Fixed
