@@ -194,8 +194,17 @@ public sealed class UpdateService
             // Restore the previous exe so context-menu conversions keep working.
             try
             {
+                // Move the failed replacement aside so it can be inspected; best effort.
                 File.Move(exePath, downloadedFilePath);
-                File.Move(backupPath, exePath);
+            }
+            catch
+            {
+                // Ignore; the overwriting restore below handles a leftover replacement.
+            }
+
+            try
+            {
+                File.Move(backupPath, exePath, overwrite: true);
             }
             catch
             {
