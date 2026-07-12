@@ -22,6 +22,8 @@ public sealed class SettingsForm : Form
     private readonly CancellationTokenSource _updateCancellation = new();
     private readonly Label _updateStatusLabel;
     private readonly Button _installUpdateButton;
+    private TableLayoutPanel? _rootLayout;
+    private FlowLayoutPanel? _buttonsPanel;
     private UpdateManifest? _availableUpdate;
     private bool _updateInProgress;
 
@@ -30,14 +32,13 @@ public sealed class SettingsForm : Form
         _settingsStore = settingsStore;
         _tempDirectory = tempDirectory;
 
-        Text = $"{AppConstants.ApplicationName} Settings";
+        Text = $"{AppConstants.ApplicationName} Settings – v{UpdateService.CurrentVersion}";
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = true;
         ClientSize = new Size(780, 640);
-        MinimumSize = new Size(780, 640);
 
         _tempFolderTextBox = CreateReadOnlyTextBox();
         _useCustomFolderCheckBox = new CheckBox
@@ -122,18 +123,56 @@ public sealed class SettingsForm : Form
         FormClosed += (_, _) => _updateCancellation.Cancel();
     }
 
+    // The dialog height is computed from the actual content once fonts and DPI
+    // scaling are applied, so no group is clipped at higher display scales.
+    protected override void OnLoad(EventArgs e)
+    {
+        base.OnLoad(e);
+        FitToContent();
+        CenterToScreen();
+    }
+
+    private void FitToContent()
+    {
+        if (_rootLayout is null || _buttonsPanel is null)
+        {
+            return;
+        }
+
+        var workingArea = Screen.FromControl(this).WorkingArea;
+        var chromeHeight = Height - ClientSize.Height;
+        var maxClientHeight = workingArea.Height - chromeHeight;
+
+        var contentHeight = _rootLayout.GetPreferredSize(new Size(_rootLayout.Width, 0)).Height;
+        var desiredHeight = Math.Min(contentHeight + _buttonsPanel.Height, maxClientHeight);
+        var desiredSize = new Size(ClientSize.Width, desiredHeight);
+        if (ClientSize != desiredSize)
+        {
+            ClientSize = desiredSize;
+        }
+
+        // Overflowing content scrolls instead; keep the bottom buttons reachable.
+        if (Bottom > workingArea.Bottom)
+        {
+            Top = Math.Max(workingArea.Top, workingArea.Bottom - Height);
+        }
+    }
+
     private void BuildLayout()
     {
         var buttonsPanel = BuildButtonsPanel();
         buttonsPanel.Dock = DockStyle.Bottom;
         Controls.Add(buttonsPanel);
+        _buttonsPanel = buttonsPanel;
 
         var root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             Padding = new Padding(14),
             ColumnCount = 1,
-            RowCount = 5
+            RowCount = 5,
+            // If the content is taller than the capped dialog height, scroll it.
+            AutoScroll = true
         };
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -141,6 +180,7 @@ public sealed class SettingsForm : Form
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         Controls.Add(root);
+        _rootLayout = root;
 
         var introLabel = new Label
         {
@@ -248,6 +288,17 @@ public sealed class SettingsForm : Form
         table.Controls.Add(_updateStatusLabel, 1, 1);
 
         group.Controls.Add(table);
+
+        // Async status text and the install button change the group height after
+        // the initial layout; grow the dialog with it so nothing gets clipped.
+        group.SizeChanged += (_, _) =>
+        {
+            if (IsHandleCreated)
+            {
+                FitToContent();
+            }
+        };
+
         return group;
     }
 
