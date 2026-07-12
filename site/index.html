@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HeicToClipboard – Right click HEIC → C&amp;C to JPEG → Ctrl+V</title>
+  <meta name="description" content="HeicToClipboard adds a Windows Explorer context-menu entry that converts HEIC/HEIF photos to JPEG and puts them on the clipboard, ready to paste anywhere.">
+  <style>
+    :root{
+      --bg:#0f172a; --card:#111827; --card2:#151f32; --text:#e5e7eb; --muted:#9ca3af;
+      --accent:#38bdf8; --good:#22c55e; --warn:#f59e0b; --border:#1f2937;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:radial-gradient(circle at top,#1e293b 0,var(--bg) 45%);color:var(--text);line-height:1.6}
+    main{max-width:1120px;margin:auto;padding:40px 20px 56px}
+    h1,h2,h3{margin-top:0;line-height:1.2}
+    h1{font-size:clamp(2.5rem,7vw,4.2rem);margin-bottom:14px}
+    h2{font-size:1.55rem}
+    p{margin-top:0}
+    .hero{text-align:center;padding:28px 0 10px}
+    .lead{max-width:820px;margin:0 auto 24px;color:var(--muted);font-size:1.18rem}
+    .buttons{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:24px 0}
+    .btn{display:inline-block;padding:13px 20px;border-radius:999px;text-decoration:none;font-weight:700;background:var(--accent);color:#082f49}
+    .btn.secondary{background:transparent;color:var(--text);border:1px solid var(--border)}
+    .btn.disabled{opacity:.5;pointer-events:none}
+    .download-note{color:var(--muted);font-size:.95rem}
+    section,.card{background:rgba(17,24,39,.93);border:1px solid var(--border);border-radius:18px;padding:24px;margin-top:18px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(275px,1fr));gap:18px;margin-top:18px}
+    .card{margin-top:0;background:rgba(21,31,50,.9)}
+    ul,ol{padding-left:20px;margin-bottom:0}
+    li+li{margin-top:6px}
+    kbd{padding:2px 7px;border:1px solid #475569;border-bottom-width:3px;border-radius:6px;background:#020617;color:#fff;white-space:nowrap}
+    code{background:#020617;border:1px solid var(--border);border-radius:6px;padding:2px 6px}
+    pre{background:#020617;border:1px solid var(--border);border-radius:12px;padding:14px;overflow-x:auto}
+    pre code{background:none;border:none;padding:0}
+    .muted{color:var(--muted)}
+    .good{color:var(--good);font-weight:700}
+    .tagrow{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:18px}
+    .tag{border:1px solid var(--border);background:#0b1220;border-radius:999px;padding:6px 11px;color:var(--muted);font-size:.95rem}
+    .feature-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;padding-left:0;list-style:none}
+    .feature-list li{background:#0b1220;border:1px solid var(--border);border-radius:14px;padding:13px;margin:0}
+    footer{text-align:center;color:var(--muted);margin-top:28px;font-size:.95rem}
+  </style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <h1>HeicToClipboard</h1>
+    <p class="lead">
+      Right click a HEIC photo → <strong>C&amp;C to JPEG</strong> → <kbd>Ctrl</kbd>+<kbd>V</kbd>.
+      A tiny Windows tool that converts HEIC/HEIF images to JPEG and puts them on the clipboard,
+      ready to paste into Discord, email, forums or any app that does not accept HEIC.
+    </p>
+
+    <div class="buttons">
+      <a id="download-windows" class="btn disabled" href="#">Loading Windows version…</a>
+      <a class="btn secondary" href="https://github.com/rvenes/heic-to-clipboard">GitHub · MIT License</a>
+    </div>
+    <p class="download-note">
+      Version info is read from <code>latest.json</code>. The installed app checks the same file and offers updates automatically.
+    </p>
+
+    <div class="tagrow">
+      <span class="tag">Windows 10 / 11</span>
+      <span class="tag">HEIC → JPEG</span>
+      <span class="tag">Explorer context menu</span>
+      <span class="tag">Clipboard</span>
+      <span class="tag">No telemetry</span>
+      <span class="tag">Open source</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>Install</h2>
+    <p>Open <strong>PowerShell</strong> and run:</p>
+    <pre><code>irm https://venes.org/heictoclipboard/install.ps1 | iex</code></pre>
+    <p class="muted">
+      This downloads the latest <code>HeicToClipboard.exe</code>, verifies its SHA-256 checksum, installs it to
+      <code>%LocalAppData%\Programs\HeicToClipboard</code> and adds <strong>C&amp;C to JPEG</strong> to the Explorer
+      context menu for <code>.heic</code> and <code>.heif</code> files. No admin rights needed.
+      Prefer manual setup? Download the exe with the button above and follow the instructions in the
+      <a href="https://github.com/rvenes/heic-to-clipboard#installation" style="color:var(--accent)">README</a>.
+    </p>
+  </section>
+
+  <section>
+    <h2>Usage</h2>
+    <ol>
+      <li>Right click one or more <code>.heic</code> / <code>.heif</code> files in Explorer</li>
+      <li>Select <strong>C&amp;C to JPEG</strong></li>
+      <li>Go to Discord or another app and press <kbd>Ctrl</kbd>+<kbd>V</kbd></li>
+    </ol>
+    <p class="muted" style="margin-top:12px">
+      Starting <code>HeicToClipboard.exe</code> directly opens a settings window for output folder, max file size,
+      JPEG quality, resolution cap and temp-file cleanup — and checks for updates.
+    </p>
+  </section>
+
+  <section>
+    <h2>Key features</h2>
+    <ul class="feature-list">
+      <li><span class="good">One clipboard batch</span><br>Select many files at once; all of them end up together on the clipboard.</li>
+      <li><span class="good">Correct colors</span><br>Wide-gamut photos (iPhone Display P3) are converted to sRGB so they look right everywhere.</li>
+      <li><span class="good">Size-limit aware</span><br>Picks the highest JPEG quality that fits under the size limit (9.8&nbsp;MB by default, Discord-friendly).</li>
+      <li><span class="good">No file clutter</span><br>No JPEG files are written next to your originals; temp files clean themselves up.</li>
+      <li><span class="good">Configurable</span><br>Output folder, max file size, quality, longest-side cap and cleanup age.</li>
+      <li><span class="good">Auto-update</span><br>The settings window checks this page for new versions and updates in place.</li>
+    </ul>
+  </section>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Requirements</h2>
+      <ul>
+        <li>Windows 10 or Windows 11</li>
+        <li><strong>HEIF Image Extensions</strong> from the Microsoft Store</li>
+      </ul>
+      <p class="muted" style="margin-top:12px">If HEIF support is missing, the app shows a message explaining how to install it.</p>
+    </section>
+
+    <section class="card">
+      <h2>Privacy</h2>
+      <ul>
+        <li>No telemetry, no background services</li>
+        <li>Your images never leave your PC</li>
+        <li>The only network access is the update check against <code>venes.org/heictoclipboard</code> when you open the settings window</li>
+      </ul>
+    </section>
+  </div>
+
+  <section>
+    <h2>Updates and source code</h2>
+    <p>
+      The update feed is hosted at <code>venes.org/heictoclipboard</code>. Release files are
+      <code>latest.json</code> and the versioned <code>HeicToClipboard-x.y.z.exe</code>.
+      The source code is available on GitHub and released under the MIT license.
+    </p>
+    <p><a class="btn secondary" href="https://github.com/rvenes/heic-to-clipboard">Open HeicToClipboard on GitHub</a></p>
+  </section>
+
+  <section>
+    <h2>Support the project</h2>
+    <p>
+      HeicToClipboard is created and maintained in spare time and released as free and open-source software.
+      If this tool saved you time, you can support development with a small donation.
+    </p>
+    <p><a class="btn secondary" href="https://www.paypal.com/donate/?business=VSSTWS8ETDPXW&amp;no_recurring=0&amp;item_name=Support+development+of+free+open-source+tools.+Donations+help+maintain+and+improve+these+projects.&amp;currency_code=USD">Donate via PayPal</a></p>
+  </section>
+
+  <footer>
+    HeicToClipboard is an independent open source project by rvenes.
+  </footer>
+</main>
+
+<script>
+async function loadWindows(){
+  const btn = document.getElementById('download-windows');
+  try{
+    const response = await fetch('latest.json',{cache:'no-store'});
+    if(!response.ok) throw new Error('Could not load latest.json');
+
+    const manifest = await response.json();
+    if(!manifest.file) throw new Error('No Windows download found');
+
+    btn.href = encodeURI(manifest.file);
+    btn.textContent = manifest.version ? 'Download for Windows ' + manifest.version : 'Download for Windows';
+    btn.classList.remove('disabled');
+  }catch(e){
+    btn.textContent = 'Windows download unavailable';
+    console.error(e);
+  }
+}
+
+loadWindows();
+</script>
+</body>
+</html>

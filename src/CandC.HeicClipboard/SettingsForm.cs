@@ -18,6 +18,11 @@ public sealed class SettingsForm : Form
     private readonly CheckBox _keepOriginalResolutionCheckBox;
     private readonly TextBox _maxLongestSideTextBox;
     private readonly NumericUpDown _cleanupDaysNumeric;
+    private readonly UpdateService _updateService = new();
+    private readonly Label _updateStatusLabel;
+    private readonly Button _installUpdateButton;
+    private UpdateManifest? _availableUpdate;
+    private bool _updateInProgress;
 
     public SettingsForm(HeicToClipboardSettings settings, HeicToClipboardSettingsStore settingsStore, string tempDirectory)
     {
@@ -30,8 +35,8 @@ public sealed class SettingsForm : Form
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = true;
-        ClientSize = new Size(780, 560);
-        MinimumSize = new Size(780, 560);
+        ClientSize = new Size(780, 640);
+        MinimumSize = new Size(780, 640);
 
         _tempFolderTextBox = CreateReadOnlyTextBox();
         _useCustomFolderCheckBox = new CheckBox
@@ -96,8 +101,23 @@ public sealed class SettingsForm : Form
             Width = 110
         };
 
+        _updateStatusLabel = new Label
+        {
+            AutoSize = true,
+            Anchor = AnchorStyles.Left,
+            MaximumSize = new Size(420, 0),
+            Margin = new Padding(0, 8, 10, 8)
+        };
+
+        _installUpdateButton = CreateSmallButton("Install update");
+        _installUpdateButton.AutoSize = true;
+        _installUpdateButton.Visible = false;
+        _installUpdateButton.Click += async (_, _) => await InstallUpdateAsync();
+
         BuildLayout();
         LoadSettings(settings);
+
+        Shown += async (_, _) => await CheckForUpdatesAsync();
     }
 
     private void BuildLayout()
@@ -111,8 +131,9 @@ public sealed class SettingsForm : Form
             Dock = DockStyle.Fill,
             Padding = new Padding(14),
             ColumnCount = 1,
-            RowCount = 4
+            RowCount = 5
         };
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -130,7 +151,8 @@ public sealed class SettingsForm : Form
 
         root.Controls.Add(BuildStorageGroup(), 0, 1);
         root.Controls.Add(BuildImageGroup(), 0, 2);
-        root.Controls.Add(new Panel { Dock = DockStyle.Fill, Margin = new Padding(0) }, 0, 3);
+        root.Controls.Add(BuildUpdatesGroup(), 0, 3);
+        root.Controls.Add(new Panel { Dock = DockStyle.Fill, Margin = new Padding(0) }, 0, 4);
     }
 
     private GroupBox BuildStorageGroup()
@@ -194,6 +216,126 @@ public sealed class SettingsForm : Form
 
         group.Controls.Add(table);
         return group;
+    }
+
+    private GroupBox BuildUpdatesGroup()
+    {
+        var group = new GroupBox
+        {
+            Text = "Updates",
+            Dock = DockStyle.Top,
+            Padding = new Padding(12),
+            Margin = new Padding(0, 0, 0, 12),
+            AutoSize = true
+        };
+
+        var versionLabel = new Label
+        {
+            Text = $"Version {UpdateService.CurrentVersion}",
+            AutoSize = true,
+            Anchor = AnchorStyles.Left,
+            Margin = new Padding(0, 8, 10, 8)
+        };
+
+        var table = CreateTableLayout();
+        table.Controls.Add(CreateRowLabel("Installed version"), 0, 0);
+        table.Controls.Add(versionLabel, 1, 0);
+        table.Controls.Add(_installUpdateButton, 2, 0);
+
+        table.Controls.Add(CreateRowLabel("Status"), 0, 1);
+        table.Controls.Add(_updateStatusLabel, 1, 1);
+
+        group.Controls.Add(table);
+        return group;
+    }
+
+    private async Task CheckForUpdatesAsync()
+    {
+        if (!UpdateService.IsSelfUpdateSupported)
+        {
+            _updateStatusLabel.Text = "Automatic updates work only in the installed app.";
+            return;
+        }
+
+        _updateStatusLabel.Text = "Checking for updates...";
+
+        UpdateCheckResult result;
+        try
+        {
+            result = await _updateService.CheckForUpdateAsync();
+        }
+        catch (Exception exception)
+        {
+            _updateStatusLabel.Text = $"Update check failed: {exception.Message}";
+            return;
+        }
+
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        switch (result.State)
+        {
+            case UpdateCheckState.UpToDate:
+                _updateStatusLabel.Text = $"You have the latest version ({UpdateService.CurrentVersion}).";
+                break;
+            case UpdateCheckState.Failed:
+                _updateStatusLabel.Text = result.Error;
+                break;
+            case UpdateCheckState.UpdateAvailable:
+                _availableUpdate = result.Manifest;
+                _updateStatusLabel.Text = $"Version {result.Manifest!.Version} is available.";
+                _installUpdateButton.Visible = true;
+
+                var answer = MessageBox.Show(
+                    this,
+                    $"A new version of {AppConstants.ApplicationName} is available.{Environment.NewLine}{Environment.NewLine}" +
+                    $"Installed version: {UpdateService.CurrentVersion}{Environment.NewLine}" +
+                    $"New version: {result.Manifest.Version}{Environment.NewLine}{Environment.NewLine}" +
+                    "Do you want to download and install it now?",
+                    AppConstants.ApplicationName,
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question);
+                if (answer == DialogResult.Yes)
+                {
+                    await InstallUpdateAsync();
+                }
+
+                break;
+        }
+    }
+
+    private async Task InstallUpdateAsync()
+    {
+        if (_availableUpdate is null || _updateInProgress)
+        {
+            return;
+        }
+
+        _updateInProgress = true;
+        _installUpdateButton.Enabled = false;
+
+        try
+        {
+            var progress = new Progress<int>(percent => _updateStatusLabel.Text = $"Downloading update... {percent}%");
+            var downloadPath = await _updateService.DownloadAsync(_availableUpdate, progress);
+            _updateStatusLabel.Text = "Restarting to finish the update...";
+            _updateService.ApplyAndRestart(downloadPath);
+            Close();
+        }
+        catch (Exception exception)
+        {
+            _updateInProgress = false;
+            _installUpdateButton.Enabled = true;
+            _updateStatusLabel.Text = "The update could not be installed.";
+            MessageBox.Show(
+                this,
+                $"The update could not be installed.{Environment.NewLine}{Environment.NewLine}{exception.Message}",
+                AppConstants.ApplicationName,
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
     }
 
     private FlowLayoutPanel BuildButtonsPanel()

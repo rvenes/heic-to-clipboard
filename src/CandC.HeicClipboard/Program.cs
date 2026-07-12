@@ -28,6 +28,8 @@ internal static class Program
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
 
+        UpdateService.CleanupStaleBackup();
+
         var settingsStore = new HeicToClipboardSettingsStore(Path.Combine(AppContext.BaseDirectory, AppConstants.SettingsFileName));
 
         if (args.Length == 0)

@@ -8,6 +8,8 @@ public static class AppConstants
     public const string TempFolderName = "HeicClipboardConvert";
     public const string TempFilePrefix = "HeicToClipboard_";
     public const string MutexName = @"Local\HeicToClipboard_BatchMutex";
+    public const string UpdateBaseUrl = "https://venes.org/heictoclipboard/";
+    public const string UpdateFeedUrl = UpdateBaseUrl + "latest.json";
     public const string PipeName = "HeicToClipboard_BatchPipe";
     public const int ClipboardRetryCount = 10;
     public const int ClipboardRetryDelayMilliseconds = 100;

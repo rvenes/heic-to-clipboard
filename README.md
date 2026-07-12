@@ -23,6 +23,16 @@ If HEIF support is missing the app will show a message explaining how to install
 
 ## Installation
 
+### Easiest: from venes.org
+
+Open **PowerShell** and run:
+
+    irm https://venes.org/heictoclipboard/install.ps1 | iex
+
+This downloads the latest release from https://venes.org/heictoclipboard/, verifies its SHA-256 checksum, installs it, and registers the context menu. No admin rights needed.
+
+### Manual: from GitHub
+
 1. Download the ZIP from the **GitHub Releases page**
 2. Extract the ZIP
 3. Open **PowerShell** in the extracted folder
@@ -57,6 +67,12 @@ the app opens its settings window instead of converting files.
 
 ---
 
+## Updates
+
+When you open the settings window (start the exe without files), the app checks https://venes.org/heictoclipboard/latest.json for a new version. If one is available it asks before downloading; the download is verified with a SHA-256 checksum, the installed exe is swapped in place, and the app restarts. Nothing is sent to the server, and no check happens during normal context-menu conversions.
+
+---
+
 ## What the tool does
 
 - Converts HEIC / HEIF → JPEG
@@ -87,7 +103,7 @@ Temporary files are cleaned automatically when temp-folder mode is active. The d
 - No telemetry
 - No background services
 
-The application never uploads files.
+The application never uploads files. The only network access is the version check against `venes.org/heictoclipboard` when the settings window is opened.
 
 By default it writes generated JPEG files to the local temp folder and cleans up its own old temp files automatically.
 
