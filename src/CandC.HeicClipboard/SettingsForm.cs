@@ -128,15 +128,23 @@ public sealed class SettingsForm : Form
     protected override void OnLoad(EventArgs e)
     {
         base.OnLoad(e);
+        FitToContent();
+        CenterToScreen();
+    }
 
+    private void FitToContent()
+    {
         if (_rootLayout is null || _buttonsPanel is null)
         {
             return;
         }
 
         var contentHeight = _rootLayout.GetPreferredSize(new Size(_rootLayout.Width, 0)).Height;
-        ClientSize = new Size(ClientSize.Width, contentHeight + _buttonsPanel.Height);
-        CenterToScreen();
+        var desiredSize = new Size(ClientSize.Width, contentHeight + _buttonsPanel.Height);
+        if (ClientSize != desiredSize)
+        {
+            ClientSize = desiredSize;
+        }
     }
 
     private void BuildLayout()
@@ -267,6 +275,17 @@ public sealed class SettingsForm : Form
         table.Controls.Add(_updateStatusLabel, 1, 1);
 
         group.Controls.Add(table);
+
+        // Async status text and the install button change the group height after
+        // the initial layout; grow the dialog with it so nothing gets clipped.
+        group.SizeChanged += (_, _) =>
+        {
+            if (IsHandleCreated)
+            {
+                FitToContent();
+            }
+        };
+
         return group;
     }
 
