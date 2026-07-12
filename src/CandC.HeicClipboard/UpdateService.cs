@@ -23,6 +23,7 @@ public sealed class UpdateService
 {
     private static readonly HttpClient Http = CreateHttpClient();
     private static readonly TimeSpan CheckTimeout = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan DownloadStallTimeout = TimeSpan.FromSeconds(60);
 
     private readonly Uri _feedUri = new(AppConstants.UpdateFeedUrl);
     private readonly Uri _baseUri = new(AppConstants.UpdateBaseUrl);
@@ -107,24 +108,42 @@ public sealed class UpdateService
 
         try
         {
-            using var response = await Http.GetAsync(
-                manifest.ResolveDownloadUri(_baseUri),
-                HttpCompletionOption.ResponseHeadersRead,
-                cancellationToken).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
+            // The stall timer is re-armed on every received chunk, so slow lines are fine
+            // but a server that stops sending data aborts the download instead of hanging.
+            using var stallSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            stallSource.CancelAfter(DownloadStallTimeout);
 
-            await using (var source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
-            await using (var target = new FileStream(downloadPath, FileMode.Create, FileAccess.Write, FileShare.None))
+            try
             {
-                var buffer = new byte[81920];
-                long totalRead = 0;
-                int read;
-                while ((read = await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+                using var response = await Http.GetAsync(
+                    manifest.ResolveDownloadUri(_baseUri),
+                    HttpCompletionOption.ResponseHeadersRead,
+                    stallSource.Token).ConfigureAwait(false);
+                response.EnsureSuccessStatusCode();
+
+                await using (var source = await response.Content.ReadAsStreamAsync(stallSource.Token).ConfigureAwait(false))
+                await using (var target = new FileStream(downloadPath, FileMode.Create, FileAccess.Write, FileShare.None))
                 {
-                    await target.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
-                    totalRead += read;
-                    percentProgress?.Report((int)Math.Clamp(totalRead * 100 / manifest.Size, 0, 100));
+                    var buffer = new byte[81920];
+                    long totalRead = 0;
+                    while (true)
+                    {
+                        stallSource.CancelAfter(DownloadStallTimeout);
+                        var read = await source.ReadAsync(buffer, stallSource.Token).ConfigureAwait(false);
+                        if (read == 0)
+                        {
+                            break;
+                        }
+
+                        await target.WriteAsync(buffer.AsMemory(0, read), stallSource.Token).ConfigureAwait(false);
+                        totalRead += read;
+                        percentProgress?.Report((int)Math.Clamp(totalRead * 100 / manifest.Size, 0, 100));
+                    }
                 }
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw new InvalidOperationException("The download timed out because no data arrived for a while.");
             }
 
             VerifyDownload(downloadPath, manifest);
@@ -162,11 +181,29 @@ public sealed class UpdateService
             throw;
         }
 
-        Process.Start(new ProcessStartInfo
+        try
         {
-            FileName = exePath,
-            UseShellExecute = true
-        });
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = exePath,
+                UseShellExecute = true
+            });
+        }
+        catch
+        {
+            // Restore the previous exe so context-menu conversions keep working.
+            try
+            {
+                File.Move(exePath, downloadedFilePath);
+                File.Move(backupPath, exePath);
+            }
+            catch
+            {
+                // Keep the original startup error; it is more useful than a failed rollback.
+            }
+
+            throw;
+        }
     }
 
     internal static void VerifyDownload(string filePath, UpdateManifest manifest)

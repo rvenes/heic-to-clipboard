@@ -19,6 +19,7 @@ public sealed class SettingsForm : Form
     private readonly TextBox _maxLongestSideTextBox;
     private readonly NumericUpDown _cleanupDaysNumeric;
     private readonly UpdateService _updateService = new();
+    private readonly CancellationTokenSource _updateCancellation = new();
     private readonly Label _updateStatusLabel;
     private readonly Button _installUpdateButton;
     private UpdateManifest? _availableUpdate;
@@ -118,6 +119,7 @@ public sealed class SettingsForm : Form
         LoadSettings(settings);
 
         Shown += async (_, _) => await CheckForUpdatesAsync();
+        FormClosed += (_, _) => _updateCancellation.Cancel();
     }
 
     private void BuildLayout()
@@ -262,11 +264,19 @@ public sealed class SettingsForm : Form
         UpdateCheckResult result;
         try
         {
-            result = await _updateService.CheckForUpdateAsync();
+            result = await _updateService.CheckForUpdateAsync(_updateCancellation.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
         }
         catch (Exception exception)
         {
-            _updateStatusLabel.Text = $"Update check failed: {exception.Message}";
+            if (!IsDisposed)
+            {
+                _updateStatusLabel.Text = $"Update check failed: {exception.Message}";
+            }
+
             return;
         }
 
@@ -318,15 +328,30 @@ public sealed class SettingsForm : Form
 
         try
         {
-            var progress = new Progress<int>(percent => _updateStatusLabel.Text = $"Downloading update... {percent}%");
-            var downloadPath = await _updateService.DownloadAsync(_availableUpdate, progress);
+            var progress = new Progress<int>(percent =>
+            {
+                if (!IsDisposed)
+                {
+                    _updateStatusLabel.Text = $"Downloading update... {percent}%";
+                }
+            });
+            var downloadPath = await _updateService.DownloadAsync(_availableUpdate, progress, _updateCancellation.Token);
             _updateStatusLabel.Text = "Restarting to finish the update...";
             _updateService.ApplyAndRestart(downloadPath);
             Close();
         }
+        catch (OperationCanceledException)
+        {
+            _updateInProgress = false;
+        }
         catch (Exception exception)
         {
             _updateInProgress = false;
+            if (IsDisposed)
+            {
+                return;
+            }
+
             _installUpdateButton.Enabled = true;
             _updateStatusLabel.Text = "The update could not be installed.";
             MessageBox.Show(
