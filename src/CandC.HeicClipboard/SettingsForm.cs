@@ -139,11 +139,22 @@ public sealed class SettingsForm : Form
             return;
         }
 
+        var workingArea = Screen.FromControl(this).WorkingArea;
+        var chromeHeight = Height - ClientSize.Height;
+        var maxClientHeight = workingArea.Height - chromeHeight;
+
         var contentHeight = _rootLayout.GetPreferredSize(new Size(_rootLayout.Width, 0)).Height;
-        var desiredSize = new Size(ClientSize.Width, contentHeight + _buttonsPanel.Height);
+        var desiredHeight = Math.Min(contentHeight + _buttonsPanel.Height, maxClientHeight);
+        var desiredSize = new Size(ClientSize.Width, desiredHeight);
         if (ClientSize != desiredSize)
         {
             ClientSize = desiredSize;
+        }
+
+        // Overflowing content scrolls instead; keep the bottom buttons reachable.
+        if (Bottom > workingArea.Bottom)
+        {
+            Top = Math.Max(workingArea.Top, workingArea.Bottom - Height);
         }
     }
 
@@ -159,7 +170,9 @@ public sealed class SettingsForm : Form
             Dock = DockStyle.Fill,
             Padding = new Padding(14),
             ColumnCount = 1,
-            RowCount = 5
+            RowCount = 5,
+            // If the content is taller than the capped dialog height, scroll it.
+            AutoScroll = true
         };
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
