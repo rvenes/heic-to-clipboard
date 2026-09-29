@@ -3,6 +3,17 @@ namespace CandC.HeicClipboard.Tests;
 public sealed class HeicConversionOptionsTests
 {
     [Fact]
+    public void DefaultLimit_FitsDecimalTenMegabyteUploadLimit()
+    {
+        var options = HeicConversionOptions.FromSettings(HeicToClipboardSettings.CreateDefault());
+
+        Assert.Equal(9_800_000, options.MaximumBytes);
+        Assert.True(options.MaximumBytes < 10_000_000);
+        Assert.Equal(150_000, AppConstants.ToBytes(0.15m));
+        Assert.Equal(1, AppConstants.ToBytes(0.0000019m));
+    }
+
+    [Fact]
     public void SizeLimitExceededMessage_UsesDefaultLimit()
     {
         var options = HeicConversionOptions.FromSettings(HeicToClipboardSettings.CreateDefault());

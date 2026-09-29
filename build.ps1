@@ -30,4 +30,6 @@ if (Test-Path $publishDir) {
     -p:AssemblyName=HeicToClipboard `
     --output $publishDir
 
+& (Join-Path $repoRoot 'tests\Uninstall.Tests.ps1') -PublishedExe (Join-Path $publishDir 'HeicToClipboard.exe')
+
 Write-Host "Published output: $publishDir"

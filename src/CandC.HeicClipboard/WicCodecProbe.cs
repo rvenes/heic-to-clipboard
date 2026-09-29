@@ -308,9 +308,24 @@ internal interface IWICMetadataQueryReader
     void GetEnumerator(out IntPtr enumerator);
 }
 
+[StructLayout(LayoutKind.Sequential)]
+internal struct PropVariantCountedArray
+{
+    public uint Count;
+    public IntPtr Elements;
+}
+
 [StructLayout(LayoutKind.Explicit)]
 internal struct PropVariantUnion
 {
+    // Native PROPVARIANT also holds counted arrays. Their count/pointer pair
+    // occupies 16 bytes on x64, making PROPVARIANT 24 bytes (16 on x86).
+    [FieldOffset(0)]
+    public PropVariantCountedArray CountedArray;
+
+    [FieldOffset(0)]
+    public long Int64Value;
+
     [FieldOffset(0)]
     public byte ByteValue;
 

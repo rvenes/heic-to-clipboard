@@ -8,7 +8,7 @@ public sealed record HeicConversionOptions(long MaximumBytes, int InitialJpegQua
     {
         get
         {
-            var megabytes = MaximumBytes / (1024d * 1024d);
+            var megabytes = MaximumBytes / (double)AppConstants.BytesPerMegabyte;
             return megabytes >= 0.01
                 ? string.Create(CultureInfo.InvariantCulture, $"Could not keep the JPEG under {megabytes:0.##} MB.")
                 : string.Create(CultureInfo.InvariantCulture, $"Could not keep the JPEG under {MaximumBytes} bytes.");

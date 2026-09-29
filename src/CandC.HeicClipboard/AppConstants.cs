@@ -30,5 +30,7 @@ public static class AppConstants
 
     public static string DefaultTempDirectory => Path.Combine(Path.GetTempPath(), TempFolderName);
 
-    public static long ToBytes(decimal megabytes) => (long)Math.Floor((double)(megabytes * 1024m * 1024m));
+    public const long BytesPerMegabyte = 1_000_000;
+
+    public static long ToBytes(decimal megabytes) => (long)decimal.Floor(megabytes * BytesPerMegabyte);
 }

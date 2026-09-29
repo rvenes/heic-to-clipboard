@@ -96,6 +96,12 @@ When you open the settings window (start the exe without files), the app checks 
 
 Temporary files are cleaned automatically when temp-folder mode is active. The default age is 24 hours and can be changed in the settings window.
 
+File-size limits use decimal megabytes (1 MB = 1,000,000 bytes). If a selected custom output folder is unavailable, conversion stops with an error instead of silently using temporary storage.
+
+## Uninstallation
+
+Run `uninstall.ps1` to remove the matching Explorer context-menu entries. Add `-RemoveInstalledFiles` to remove the app executable and its recognized update backup. Settings and other files are preserved, and the installation directory is removed only if empty. Use `-WhatIf` to preview the operation. For a custom installation, pass the same `-InstallDir` used during installation.
+
 ---
 
 ## Security
@@ -120,6 +126,8 @@ Build and test locally with:
 This restores, builds, runs the test suite, and publishes a self-contained exe to `artifacts\publish\win-x64`.
 
 A few integration tests decode real HEIC files from a local sample folder. They are skipped automatically when the folder or the Windows HEIF codec is not available, so the test suite passes on any machine.
+
+Set `HEICTOCLIPBOARD_TEST_SAMPLES` to a local folder of HEIC/HEIF test images to require real-image tests (missing samples or a missing codec then fail the tests). Sample files are only read; generated JPEGs go to separate temporary test directories. Run `tests/Uninstall.Tests.ps1 -PublishedExe <published-exe-path>` to check uninstall safety with isolated installation fixtures.
 
 ---
 

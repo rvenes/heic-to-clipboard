@@ -50,14 +50,15 @@ public sealed class InvocationCoordinator : IFileBatchSource, IDisposable
     private readonly TimeSpan _idleDelay;
     private readonly TimeSpan _maxInitialWait;
     private readonly TimeSpan _standaloneFallbackBudget;
+    private readonly TimeSpan _transferTimeout;
 
     private readonly object _gate = new();
     private readonly HashSet<string> _seenFiles = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<string> _pendingFiles = [];
     private DateTime _lastUpdateUtc;
 
-    private readonly ManualResetEventSlim _stopRequested = new(false);
-    private Thread? _serverThread;
+    private readonly CancellationTokenSource _stopRequested = new();
+    private Task? _serverTask;
     private Mutex? _ownedMutex;
     private CoordinatorRole? _role;
     private bool _disposed;
@@ -67,13 +68,15 @@ public sealed class InvocationCoordinator : IFileBatchSource, IDisposable
         string pipeName,
         TimeSpan idleDelay,
         TimeSpan maxInitialWait,
-        TimeSpan standaloneFallbackBudget)
+        TimeSpan standaloneFallbackBudget,
+        TimeSpan? transferTimeout = null)
     {
         _mutexName = mutexName;
         _pipeName = pipeName;
         _idleDelay = idleDelay;
         _maxInitialWait = maxInitialWait;
         _standaloneFallbackBudget = standaloneFallbackBudget;
+        _transferTimeout = transferTimeout ?? TimeSpan.FromSeconds(2);
         _lastUpdateUtc = DateTime.UtcNow;
     }
 
@@ -93,7 +96,7 @@ public sealed class InvocationCoordinator : IFileBatchSource, IDisposable
             throw new InvalidOperationException("CollectOrForward can only be called once.");
         }
 
-        var deadlineUtc = DateTime.UtcNow + _standaloneFallbackBudget;
+        var elapsed = Stopwatch.StartNew();
         while (true)
         {
             if (TryBecomePrimary())
@@ -104,13 +107,14 @@ public sealed class InvocationCoordinator : IFileBatchSource, IDisposable
                 return CoordinatorRole.Primary;
             }
 
-            if (TryForward(files))
+            var remaining = _standaloneFallbackBudget - elapsed.Elapsed;
+            if (remaining > TimeSpan.Zero && TryForwardAsync(files, remaining).GetAwaiter().GetResult())
             {
                 _role = CoordinatorRole.Forwarded;
                 return CoordinatorRole.Forwarded;
             }
 
-            if (DateTime.UtcNow >= deadlineUtc)
+            if (elapsed.Elapsed >= _standaloneFallbackBudget)
             {
                 Add(files);
                 _role = CoordinatorRole.Standalone;
@@ -139,7 +143,7 @@ public sealed class InvocationCoordinator : IFileBatchSource, IDisposable
             return batch;
         }
 
-        if (_serverThread is null)
+        if (_serverTask is null)
         {
             return Array.Empty<string>();
         }
@@ -214,21 +218,32 @@ public sealed class InvocationCoordinator : IFileBatchSource, IDisposable
         return true;
     }
 
-    private bool TryForward(IReadOnlyList<string> files)
+    private async Task<bool> TryForwardAsync(IReadOnlyList<string> files, TimeSpan remaining)
     {
         try
         {
-            using var client = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut);
-            client.Connect(ForwardConnectTimeoutMilliseconds);
-
             var payload = JsonSerializer.SerializeToUtf8Bytes(files);
+            if (payload.Length > MaxPayloadBytes)
+            {
+                return false;
+            }
+
+            using var timeout = new CancellationTokenSource(remaining < _transferTimeout ? remaining : _transferTimeout);
+            using var client = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+            await client.ConnectAsync(ForwardConnectTimeoutMilliseconds, timeout.Token).ConfigureAwait(false);
+
             var lengthBuffer = new byte[4];
             BinaryPrimitives.WriteInt32LittleEndian(lengthBuffer, payload.Length);
-            client.Write(lengthBuffer);
-            client.Write(payload);
-            client.Flush();
+            await client.WriteAsync(lengthBuffer, timeout.Token).ConfigureAwait(false);
+            await client.WriteAsync(payload, timeout.Token).ConfigureAwait(false);
 
-            return client.ReadByte() == AckByte;
+            var ack = new byte[1];
+            await client.ReadExactlyAsync(ack, timeout.Token).ConfigureAwait(false);
+            return ack[0] == AckByte;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
         }
         catch (TimeoutException)
         {
@@ -246,61 +261,45 @@ public sealed class InvocationCoordinator : IFileBatchSource, IDisposable
 
     private void StartServer()
     {
-        _serverThread = new Thread(ServerLoop)
-        {
-            IsBackground = true,
-            Name = "HeicToClipboard.InvocationCollector"
-        };
-        _serverThread.Start();
+        _serverTask = ServerLoopAsync();
     }
 
     private void StopServer()
     {
-        var serverThread = _serverThread;
-        if (serverThread is null)
+        var serverTask = _serverTask;
+        if (serverTask is null)
         {
             return;
         }
 
-        _serverThread = null;
-        _stopRequested.Set();
-
-        for (var attempt = 0; attempt < 5 && serverThread.IsAlive; attempt++)
-        {
-            try
-            {
-                using var poke = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut);
-                poke.Connect(ForwardConnectTimeoutMilliseconds);
-            }
-            catch (TimeoutException)
-            {
-            }
-            catch (IOException)
-            {
-            }
-
-            serverThread.Join(TimeSpan.FromMilliseconds(500));
-        }
+        // Cancellation interrupts both an idle listener and a connected peer that
+        // stopped sending. Join before draining pending files or releasing ownership.
+        _stopRequested.Cancel();
+        serverTask.GetAwaiter().GetResult();
+        _serverTask = null;
     }
 
-    private void ServerLoop()
+    private async Task ServerLoopAsync()
     {
-        while (!_stopRequested.IsSet)
+        while (!_stopRequested.IsCancellationRequested)
         {
             try
             {
-                using var server = new NamedPipeServerStream(_pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte);
-                server.WaitForConnection();
+                using var server = new NamedPipeServerStream(
+                    _pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+                await server.WaitForConnectionAsync(_stopRequested.Token).ConfigureAwait(false);
 
-                if (_stopRequested.IsSet)
+                if (_stopRequested.IsCancellationRequested)
                 {
                     // No ack is sent, so a real sender caught in shutdown will retry
                     // and take over as primary once the mutex is released.
                     return;
                 }
 
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_stopRequested.Token);
+                timeout.CancelAfter(_transferTimeout);
                 var lengthBuffer = new byte[4];
-                server.ReadExactly(lengthBuffer);
+                await server.ReadExactlyAsync(lengthBuffer, timeout.Token).ConfigureAwait(false);
                 var payloadLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBuffer);
                 if (payloadLength is <= 0 or > MaxPayloadBytes)
                 {
@@ -308,15 +307,20 @@ public sealed class InvocationCoordinator : IFileBatchSource, IDisposable
                 }
 
                 var payload = new byte[payloadLength];
-                server.ReadExactly(payload);
+                await server.ReadExactlyAsync(payload, timeout.Token).ConfigureAwait(false);
                 var forwardedFiles = JsonSerializer.Deserialize<string[]>(payload) ?? [];
 
                 // Record before acknowledging: an ack must guarantee inclusion.
                 Add(forwardedFiles);
 
-                server.WriteByte(AckByte);
-                server.Flush();
-                server.WaitForPipeDrain();
+                await server.WriteAsync(new byte[] { AckByte }, timeout.Token).ConfigureAwait(false);
+                // Let the client read the ack and close before closing our end.
+                // Unlike WaitForPipeDrain this wait is cancellable and bounded.
+                await server.ReadAsync(new byte[1], timeout.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // A stalled peer times out; shutdown cancellation ends the loop.
             }
             catch (EndOfStreamException)
             {
@@ -331,7 +335,7 @@ public sealed class InvocationCoordinator : IFileBatchSource, IDisposable
             catch (IOException)
             {
                 // Includes pipe-name-busy; back off briefly instead of spinning.
-                Thread.Sleep(PollDelayMilliseconds);
+                await Task.Delay(PollDelayMilliseconds).ConfigureAwait(false);
             }
         }
     }

@@ -43,6 +43,30 @@ public sealed class TempFileManagerTests : IDisposable
         Assert.Empty(expiredFiles);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CreateOutputPath_LongSourceName_CreatesUsableUniqueFiles(bool unicodeBoundary)
+    {
+        var manager = new TempFileManager(_workingDirectory);
+        var name = unicodeBoundary
+            ? new string('a', 210) + "\U0001F4F7" + new string('b', 20)
+            : new string('a', 230);
+
+        var first = manager.CreateOutputPath(name + ".heic");
+        var second = manager.CreateOutputPath(name + ".heic");
+
+        Assert.NotEqual(first, second);
+        Assert.InRange(Path.GetFileName(first).Length, 1, 255);
+        Assert.StartsWith(AppConstants.TempFilePrefix, Path.GetFileName(first));
+        Assert.EndsWith(".jpg", first);
+        Assert.DoesNotContain('\uFFFD', new System.Text.UTF8Encoding().GetString(System.Text.Encoding.UTF8.GetBytes(first)));
+        File.WriteAllText(first, "first result");
+        File.WriteAllText(second, "second result");
+        Assert.Equal("first result", File.ReadAllText(first));
+        Assert.Equal("second result", File.ReadAllText(second));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_workingDirectory))

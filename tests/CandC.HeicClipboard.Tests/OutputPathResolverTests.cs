@@ -35,6 +35,33 @@ public sealed class OutputPathResolverTests : IDisposable
         Assert.True(Directory.Exists(customPath));
     }
 
+    [Fact]
+    public void Resolve_UnavailableCustomFolder_FailsWithoutCreatingTempFallback()
+    {
+        Directory.CreateDirectory(_workingDirectory);
+        var blockedPath = Path.Combine(_workingDirectory, "blocked");
+        File.WriteAllText(blockedPath, "unrelated file");
+        var tempPath = Path.Combine(_workingDirectory, "temp");
+        var settings = new HeicToClipboardSettings { UseCustomOutputFolder = true, CustomOutputFolder = blockedPath };
+
+        var error = Assert.Throws<IOException>(() => OutputPathResolver.Resolve(settings, tempPath));
+
+        Assert.Contains(blockedPath, error.Message);
+        Assert.Contains("No files were converted", error.Message);
+        Assert.False(Directory.Exists(tempPath));
+        Assert.Equal("unrelated file", File.ReadAllText(blockedPath));
+    }
+
+    [Fact]
+    public void Resolve_EmptyCustomFolder_FailsWithoutCreatingTempFallback()
+    {
+        var tempPath = Path.Combine(_workingDirectory, "temp");
+        var settings = new HeicToClipboardSettings { UseCustomOutputFolder = true, CustomOutputFolder = " " };
+
+        Assert.Throws<IOException>(() => OutputPathResolver.Resolve(settings, tempPath));
+        Assert.False(Directory.Exists(tempPath));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_workingDirectory))

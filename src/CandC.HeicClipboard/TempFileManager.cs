@@ -60,7 +60,20 @@ public sealed class TempFileManager
     {
         var baseName = Sanitize(Path.GetFileNameWithoutExtension(sourcePath));
         var token = Guid.NewGuid().ToString("N")[..8];
-        var fileName = $"{AppConstants.TempFilePrefix}{baseName}_{DateTime.UtcNow:yyyyMMddHHmmss}_{token}.jpg";
+        var suffix = $"_{DateTime.UtcNow:yyyyMMddHHmmss}_{token}.jpg";
+        var maxBaseNameLength = 255 - AppConstants.TempFilePrefix.Length - suffix.Length;
+        if (baseName.Length > maxBaseNameLength)
+        {
+            // Do not split a UTF-16 surrogate pair when shortening the readable name.
+            if (char.IsHighSurrogate(baseName[maxBaseNameLength - 1]))
+            {
+                maxBaseNameLength--;
+            }
+
+            baseName = baseName[..maxBaseNameLength];
+        }
+
+        var fileName = $"{AppConstants.TempFilePrefix}{baseName}{suffix}";
         return Path.Combine(WorkingDirectory, fileName);
     }
 

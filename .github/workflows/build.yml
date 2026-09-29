@@ -46,6 +46,10 @@ jobs:
           -p:AssemblyName=HeicToClipboard
           --output artifacts/publish/win-x64
 
+      - name: Test uninstall safety
+        shell: pwsh
+        run: ./tests/Uninstall.Tests.ps1 -PublishedExe artifacts/publish/win-x64/HeicToClipboard.exe
+
       - name: Upload publish artifacts
         if: startsWith(github.ref, 'refs/tags/v')
         uses: actions/upload-artifact@v4

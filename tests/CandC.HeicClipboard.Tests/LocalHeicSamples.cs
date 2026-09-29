@@ -4,7 +4,9 @@ namespace CandC.HeicClipboard.Tests;
 
 internal static class LocalHeicSamples
 {
-    public const string SamplesDirectory = @"H:\Koding\CandC-Samples";
+    private static string? ExplicitSamplesDirectory => Environment.GetEnvironmentVariable("HEICTOCLIPBOARD_TEST_SAMPLES");
+
+    public static string SamplesDirectory => ExplicitSamplesDirectory ?? @"H:\Koding\CandC-Samples";
 
     public static IReadOnlyList<string> GetFiles()
     {
@@ -36,10 +38,24 @@ internal static class LocalHeicSamples
         var files = GetFiles();
         if (files.Count == 0)
         {
+            if (ExplicitSamplesDirectory is not null)
+            {
+                throw new InvalidOperationException("The explicitly configured HEIC sample directory contains no samples.");
+            }
             return [];
         }
 
-        return CanDecode(files[0]) ? files : [];
+        if (CanDecode(files[0]))
+        {
+            return files;
+        }
+
+        if (ExplicitSamplesDirectory is not null)
+        {
+            throw new InvalidOperationException("The explicitly configured HEIC samples cannot be decoded on this machine.");
+        }
+
+        return [];
     }
 
     private static bool CanDecode(string sourcePath)

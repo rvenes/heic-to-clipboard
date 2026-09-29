@@ -1,3 +1,7 @@
+using System.Buffers.Binary;
+using System.Diagnostics;
+using System.IO.Pipes;
+
 namespace CandC.HeicClipboard.Tests;
 
 public sealed class InvocationCoordinatorTests
@@ -211,6 +215,103 @@ public sealed class InvocationCoordinatorTests
         var sessionId = System.Diagnostics.Process.GetCurrentProcess().SessionId;
 
         Assert.Equal($"{AppConstants.PipeName}_{sessionId}", InvocationCoordinator.SessionPipeName);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(20000)]
+    public async Task ConnectedPrimaryThatNeverReadsOrAcknowledges_FallsBackWithinBudget(int fileCount)
+    {
+        var names = CreateUniqueNames();
+        using var ready = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var holder = new Thread(() =>
+        {
+            using var mutex = new Mutex(true, names.MutexName);
+            try
+            {
+                using var pipe = new NamedPipeServerStream(names.PipeName, PipeDirection.InOut, 1,
+                    PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+                ready.Set();
+                pipe.WaitForConnectionAsync(stop.Token).GetAwaiter().GetResult();
+                release.Wait(stop.Token);
+            }
+            catch (OperationCanceledException) { }
+            finally { mutex.ReleaseMutex(); }
+        }) { IsBackground = true };
+        holder.Start();
+
+        try
+        {
+            Assert.True(ready.Wait(TimeSpan.FromSeconds(3)));
+            var role = await Task.Run(() =>
+            {
+                using var secondary = CreateCoordinator(names, fallback: TimeSpan.FromMilliseconds(600));
+                var files = Enumerable.Range(0, fileCount).Select(i => $@"C:\Images\sample-{i}.heic").ToArray();
+                var result = secondary.CollectOrForward(files);
+                Assert.Equal(fileCount, secondary.WaitForFirstBatch().Count);
+                return result;
+            }).WaitAsync(TimeSpan.FromSeconds(4));
+
+            Assert.Equal(CoordinatorRole.Standalone, role);
+        }
+        finally
+        {
+            release.Set();
+            stop.Cancel();
+            Assert.True(holder.Join(TimeSpan.FromSeconds(3)));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void StalledSender_DoesNotBlockFollowingFiles(bool partialPayload)
+    {
+        var names = CreateUniqueNames();
+        using var primary = new InvocationCoordinator(names.MutexName, names.PipeName,
+            ShortIdle, ShortMaxWait, ShortFallback, TimeSpan.FromMilliseconds(250));
+        primary.CollectOrForward([@"C:\Images\first.heic"]);
+        using var stalled = new NamedPipeClientStream(".", names.PipeName, PipeDirection.InOut);
+        stalled.Connect(3000);
+        if (partialPayload)
+        {
+            var header = new byte[4];
+            BinaryPrimitives.WriteInt32LittleEndian(header, 100);
+            stalled.Write(header);
+            stalled.WriteByte((byte)'[');
+        }
+        else
+        {
+            stalled.WriteByte(100); // incomplete length header
+        }
+
+        Assert.Equal(CoordinatorRole.Forwarded, RunSecondary(names, @"C:\Images\next.heic"));
+        Assert.Equal(new[] { @"C:\Images\first.heic", @"C:\Images\next.heic" }, primary.WaitForFirstBatch());
+    }
+
+    [Fact]
+    public void Shutdown_CancelsConnectedSenderAndAllowsImmediateNewPrimary()
+    {
+        var names = CreateUniqueNames();
+        using var stalled = new NamedPipeClientStream(".", names.PipeName, PipeDirection.InOut);
+        using (var primary = new InvocationCoordinator(names.MutexName, names.PipeName,
+            ShortIdle, ShortMaxWait, ShortFallback, TimeSpan.FromSeconds(30)))
+        {
+            primary.CollectOrForward([@"C:\Images\first.heic"]);
+            stalled.Connect(3000);
+            stalled.WriteByte(100);
+            var elapsed = Stopwatch.StartNew();
+
+            primary.Dispose();
+
+            Assert.True(elapsed.Elapsed < TimeSpan.FromSeconds(2), "Shutdown waited for the stalled sender.");
+        }
+
+        using var next = CreateCoordinator(names);
+        Assert.Equal(CoordinatorRole.Primary, next.CollectOrForward([@"C:\Images\next.heic"]));
+        Assert.Equal([@"C:\Images\next.heic"], next.WaitForFirstBatch());
     }
 
     [Fact]

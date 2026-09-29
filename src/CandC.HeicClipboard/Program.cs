@@ -52,7 +52,16 @@ internal static class Program
         }
 
         var settings = settingsStore.Load();
-        var outputOptions = OutputPathResolver.Resolve(settings, AppConstants.DefaultTempDirectory);
+        OutputDirectoryOptions outputOptions;
+        try
+        {
+            outputOptions = OutputPathResolver.Resolve(settings, AppConstants.DefaultTempDirectory);
+        }
+        catch (IOException exception)
+        {
+            MessageBox.Show(exception.Message, AppConstants.ApplicationName, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return 1;
+        }
         var tempFileManager = new TempFileManager(outputOptions.WorkingDirectory, outputOptions.CleanupAge, outputOptions.CleanupEnabled);
         tempFileManager.CleanupExpiredFiles();
 

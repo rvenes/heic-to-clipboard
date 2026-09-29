@@ -4,6 +4,17 @@ All notable changes to HeicToClipboard are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.2] - 2026-09-30
+
+### Fixed
+
+- Corrected the native PROPVARIANT layout on 64-bit Windows to prevent memory corruption when reading image metadata.
+- An unavailable custom output folder now produces a clear error instead of silently storing files in temporary storage.
+- Inter-process file delivery now has cancellable transfer deadlines, including shutdown while a sender is stalled.
+- Uninstall removes only recognized app executables and matching Explorer registrations; settings and unrelated files are preserved.
+- File-size limits now use decimal MB as displayed, so the default 9.8 MB is 9,800,000 bytes.
+- Long source filenames are shortened safely when generating JPEG filenames, retaining the unique suffix.
+
 ## [0.3.1] - 2026-07-12
 
 ### Fixed
