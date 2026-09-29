@@ -68,6 +68,22 @@ foreach ($registryPath in $registryTargets) {
     Set-Item -Path $commandPath -Value $commandValue
 }
 
+# Explorer can otherwise keep using its pre-install association cache.
+if (-not ('HeicToClipboard.ShellNotifications' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+namespace HeicToClipboard {
+    public static class ShellNotifications {
+        [DllImport("shell32.dll")]
+        public static extern void SHChangeNotify(int eventId, uint flags, IntPtr item1, IntPtr item2);
+    }
+}
+'@
+}
+[HeicToClipboard.ShellNotifications]::SHChangeNotify(0x08000000, 0x1000, [IntPtr]::Zero, [IntPtr]::Zero)
+
 Write-Host "Installed HeicToClipboard to $installedExe"
 Write-Host ("Installed EXE timestamp: {0:yyyy-MM-dd HH:mm:ss}" -f $installedFile.LastWriteTime)
 Write-Host 'Explorer context menu registered for .heic and .heif'
+Write-Host 'On Windows 11, use Show more options. If the entry is missing, restart Windows Explorer or sign out and back in.'

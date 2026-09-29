@@ -59,6 +59,8 @@ The command temporarily bypasses the PowerShell execution policy only for this i
 
 The images will be pasted as JPEG attachments.
 
+On Windows 11, the entry is in **Show more options**. It is available only for HEIC/HEIF files, not folders or other image formats. If an Explorer window opened before installation does not show it, restart Windows Explorer (finish any file copies first) or sign out and back in.
+
 If you start `HeicToClipboard.exe` directly from:
 
 `%LocalAppData%\Programs\HeicToClipboard`

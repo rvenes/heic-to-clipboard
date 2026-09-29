@@ -46,6 +46,7 @@ $registryTargets = @(
     'HKCU:\Software\Classes\SystemFileAssociations\.heif\shell\CandCToJpeg'
 )
 
+$registrationChanged = $false
 foreach ($registryPath in $registryTargets) {
     $commandPath = Join-Path $registryPath 'command'
     if (Test-Path -LiteralPath $commandPath) {
@@ -53,6 +54,7 @@ foreach ($registryPath in $registryTargets) {
         if ($registeredCommand -eq ('"{0}" "%1"' -f $installedExe) -and
             $PSCmdlet.ShouldProcess($registryPath, 'Remove HeicToClipboard context menu')) {
             Remove-Item -LiteralPath $registryPath -Recurse -Force
+            $registrationChanged = $true
         }
     }
 }
@@ -68,6 +70,22 @@ if ($RemoveInstalledFiles -and (Test-Path -LiteralPath $resolvedInstallDir) -and
     if ($PSCmdlet.ShouldProcess($resolvedInstallDir, 'Remove empty installation directory')) {
         [IO.Directory]::Delete($resolvedInstallDir, $false)
     }
+}
+
+if ($registrationChanged) {
+    if (-not ('HeicToClipboard.ShellNotifications' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+namespace HeicToClipboard {
+    public static class ShellNotifications {
+        [DllImport("shell32.dll")]
+        public static extern void SHChangeNotify(int eventId, uint flags, IntPtr item1, IntPtr item2);
+    }
+}
+'@
+    }
+    [HeicToClipboard.ShellNotifications]::SHChangeNotify(0x08000000, 0x1000, [IntPtr]::Zero, [IntPtr]::Zero)
 }
 
 Write-Host 'Finished processing matching Explorer context menu entries.'
